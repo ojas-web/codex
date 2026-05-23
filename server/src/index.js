@@ -33,6 +33,7 @@ const BOT_DETECTION_RADIUS = 90;
 const BOT_STOP_DISTANCE = 14;
 const BOT_MOVE_SPEED = 0.28;
 const BOT_FIRE_RANGE = 55;
+const HIT_RADIUS = 2.4;
 
 const spawnPoints = {
   [TEAM_A]: [{ x: -60, y: 2, z: -40 }, { x: -50, y: 2, z: 30 }],
@@ -55,10 +56,18 @@ const sanitizeInput = (input) => {
   if (!input) return null;
   return {
     seq: Number(input.seq) || 0,
-    pos: input.pos || { x: 0, y: 2, z: 0 },
+    pos: {
+      x: Number(input.pos?.x) || 0,
+      y: Number(input.pos?.y) || 2,
+      z: Number(input.pos?.z) || 0
+    },
     rotY: Math.max(-Math.PI, Math.min(Math.PI, Number(input.rotY) || 0)),
     pitch: Math.max(-1.4, Math.min(1.4, Number(input.pitch) || 0)),
-    velocity: input.velocity || { x: 0, y: 0, z: 0 },
+    velocity: {
+      x: Number(input.velocity?.x) || 0,
+      y: Number(input.velocity?.y) || 0,
+      z: Number(input.velocity?.z) || 0
+    },
     crouch: !!input.crouch,
     sprint: !!input.sprint,
     fire: !!input.fire,
@@ -251,7 +260,7 @@ setInterval(() => {
       const dx = proj.pos.x - target.position.x;
       const dy = proj.pos.y - target.position.y;
       const dz = proj.pos.z - target.position.z;
-      if (dx * dx + dy * dy + dz * dz < 3.5) {
+      if (dx * dx + dy * dy + dz * dz <= HIT_RADIUS * HIT_RADIUS) {
         target.hp -= proj.dmg;
         proj.ttl = 0;
         if (target.hp <= 0) {
