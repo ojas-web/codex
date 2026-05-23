@@ -55,6 +55,13 @@ const randomSpawn = (team) => {
   return spots[Math.floor(Math.random() * spots.length)];
 };
 
+
+const canDamage = (attacker, target) => {
+  if (!attacker || !target || attacker.id === target.id) return false;
+  if (attacker.bot || target.bot) return true;
+  return attacker.team !== target.team;
+};
+
 const sanitizeInput = (input) => {
   if (!input) return null;
   return {
@@ -175,12 +182,13 @@ const updateBots = () => {
     let nearestSq = BOT_DETECTION_RADIUS * BOT_DETECTION_RADIUS;
 
     for (const candidate of aliveTargets) {
-      if (candidate.id === bot.id || candidate.team === bot.team) continue;
+      if (candidate.id === bot.id || !canDamage(bot, candidate)) continue;
       const dx = candidate.position.x - bot.position.x;
       const dz = candidate.position.z - bot.position.z;
       const distSq = dx * dx + dz * dz;
-      if (distSq < nearestSq) {
-        nearestSq = distSq;
+      const weightedDistSq = candidate.bot ? distSq * 1.35 : distSq;
+      if (weightedDistSq < nearestSq) {
+        nearestSq = weightedDistSq;
         nearest = candidate;
       }
     }
@@ -282,7 +290,8 @@ setInterval(() => {
     proj.pos.z += proj.dir.z * proj.speed;
     proj.ttl -= 1;
     for (const target of state.players.values()) {
-      if (!target.alive || target.id === proj.owner || target.team === proj.team) continue;
+      const owner = state.players.get(proj.owner);
+      if (!target.alive || !canDamage(owner, target)) continue;
       const dx = proj.pos.x - target.position.x;
       const dy = proj.pos.y - target.position.y;
       const dz = proj.pos.z - target.position.z;
