@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Strike Arena</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="menu" class="panel">
+      <h1>NEON STRIKE ARENA</h1>
+      <p>Cyberpunk team deathmatch FPS.</p>
+      <button id="playBtn">Play</button>
+    </div>
+    <canvas id="game"></canvas>
+    <div id="hud">
+      <div id="crosshair">+</div>
+      <div class="topbar"><span id="timer">10:00</span><span id="score">A 0 - 0 B</span></div>
+      <div id="respawn" class="hidden">RESPAWNING...</div>
+      <div class="bottombar"><span id="health">HP 100</span><span id="ammo">30</span><span id="kills">K 0 / D 0</span></div>
+    </div>
+    <div id="mobileControls">
+      <button id="shootBtn">FIRE</button>
+      <button id="jumpBtn">JUMP</button>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
