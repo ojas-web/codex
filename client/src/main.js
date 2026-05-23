@@ -51,6 +51,8 @@ for (let i = 0; i < 40; i++) {
 scene.add(neonLines);
 
 const keys = new Set();
+const mobileControls = document.getElementById('mobileControls');
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints || 0) > 1;
 let pointerLocked = false;
 const local = { id: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 30, kills: 0, deaths: 0, weapon: 'rifle', alive: true, respawnAt: 0 };
 const players = new Map();
@@ -91,6 +93,13 @@ socket.on('snapshot', (snap) => {
   ui.timer.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 });
 
+
+mobileControls.style.display = isMobile ? 'flex' : 'none';
+if (isMobile) {
+  menu.style.display = 'none';
+  pointerLocked = true;
+}
+
 addEventListener('keydown', (e) => keys.add(e.code));
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('mousemove', (e) => {
@@ -111,15 +120,54 @@ document.getElementById('shootBtn').addEventListener('touchend', () => keys.dele
 document.getElementById('jumpBtn').addEventListener('touchstart', () => keys.add('Space'));
 
 playBtn.onclick = async () => {
+  if (isMobile) {
+    pointerLocked = true;
+    menu.style.display = 'none';
+    return;
+  }
   await canvas.requestPointerLock();
   pointerLocked = true;
   menu.style.display = 'none';
 };
 
-document.addEventListener('pointerlockchange', () => { pointerLocked = !!document.pointerLockElement; if (!pointerLocked) menu.style.display = 'grid'; });
+document.addEventListener('pointerlockchange', () => {
+  if (isMobile) {
+    pointerLocked = true;
+    return;
+  }
+  pointerLocked = !!document.pointerLockElement;
+  if (!pointerLocked) menu.style.display = 'grid';
+});
+
+
+const updateMobileAutoShoot = () => {
+  if (!isMobile || !local.alive) {
+    keys.delete('Mouse0');
+    return;
+  }
+
+  const forward = new THREE.Vector3(Math.sin(local.yaw), 0, Math.cos(local.yaw));
+  let shouldShoot = false;
+  for (const mesh of players.values()) {
+    const toEnemy = new THREE.Vector3().subVectors(mesh.position, local.pos);
+    const distance = toEnemy.length();
+    if (distance < 4 || distance > 60) continue;
+    toEnemy.y = 0;
+    toEnemy.normalize();
+    const dot = forward.dot(toEnemy);
+    if (dot > 0.86) {
+      shouldShoot = true;
+      break;
+    }
+  }
+
+  if (shouldShoot) keys.add('Mouse0');
+  else keys.delete('Mouse0');
+};
 
 const tracerMat = new THREE.LineBasicMaterial({ color: 0xffaa22 });
 function tick(dt) {
+  updateMobileAutoShoot();
   const speed = keys.has('ShiftLeft') ? 22 : keys.has('ControlLeft') ? 7 : 14;
   if (!local.alive) {
     local.vel.set(0, 0, 0);
