@@ -54,7 +54,7 @@ const keys = new Set();
 const mobileControls = document.getElementById('mobileControls');
 const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints || 0) > 1;
 let pointerLocked = false;
-const local = { id: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 30, kills: 0, deaths: 0, weapon: 'rifle', alive: true, respawnAt: 0 };
+const local = { id: null, team: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 30, kills: 0, deaths: 0, weapon: 'rifle', alive: true, respawnAt: 0 };
 const players = new Map();
 const projectiles = [];
 const tracerGroup = new THREE.Group();
@@ -62,7 +62,7 @@ scene.add(tracerGroup);
 let seq = 0;
 
 const socket = io();
-socket.on('welcome', ({ id }) => (local.id = id));
+socket.on('welcome', ({ id, team }) => { local.id = id; local.team = team; });
 socket.on('snapshot', (snap) => {
   for (const p of snap.players) {
     if (p.id === local.id) {
@@ -81,6 +81,7 @@ socket.on('snapshot', (snap) => {
     if (!m) {
       m = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.2, 6, 12), new THREE.MeshStandardMaterial({ color: p.team === 'A' ? 0x00e6ff : 0xff408d }));
       m.castShadow = true; scene.add(m); players.set(p.id, m);
+      m.userData.team = p.team;
     }
     m.position.lerp(new THREE.Vector3(p.position.x, p.position.y, p.position.z), 0.45);
   }
@@ -112,12 +113,56 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+if (isMobile) {
+  let lastTouch = null;
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    if (!lastTouch) { lastTouch = { x: t.clientX, y: t.clientY }; return; }
+    const dx = t.clientX - lastTouch.x;
+    const dy = t.clientY - lastTouch.y;
+    local.yaw -= dx * 0.004;
+    local.pitch = Math.max(-1.3, Math.min(1.3, local.pitch - dy * 0.004));
+    lastTouch = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+  canvas.addEventListener('touchend', () => { lastTouch = null; }, { passive: true });
+}
+
 addEventListener('mousedown', () => pointerLocked && keys.add('Mouse0'));
 addEventListener('mouseup', () => keys.delete('Mouse0'));
 
-document.getElementById('shootBtn').addEventListener('touchstart', () => keys.add('Mouse0'));
-document.getElementById('shootBtn').addEventListener('touchend', () => keys.delete('Mouse0'));
-document.getElementById('jumpBtn').addEventListener('touchstart', () => keys.add('Space'));
+document.getElementById('shootBtn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.add('Mouse0'); }, { passive: false });
+document.getElementById('shootBtn').addEventListener('touchend', (e) => { e.preventDefault(); keys.delete('Mouse0'); }, { passive: false });
+document.getElementById('jumpBtn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.add('Space'); setTimeout(() => keys.delete('Space'), 140); }, { passive: false });
+document.getElementById('jumpBtn').addEventListener('touchend', (e) => { e.preventDefault(); keys.delete('Space'); }, { passive: false });
+
+
+const joystick = document.getElementById('joystick');
+const joyKnob = document.getElementById('joyKnob');
+const joy = { x: 0, y: 0, active: false };
+if (isMobile && joystick && joyKnob) {
+  const maxR = 33;
+  const centerKnob = () => { joyKnob.style.left = '33px'; joyKnob.style.top = '33px'; joy.x = 0; joy.y = 0; joy.active = false; };
+  const onMove = (touch) => {
+    const rect = joystick.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = touch.clientX - cx;
+    let dy = touch.clientY - cy;
+    const len = Math.hypot(dx, dy) || 1;
+    if (len > maxR) { dx = (dx / len) * maxR; dy = (dy / len) * maxR; }
+    joy.x = dx / maxR;
+    joy.y = dy / maxR;
+    joy.active = true;
+    joyKnob.style.left = `${33 + dx}px`;
+    joyKnob.style.top = `${33 + dy}px`;
+  };
+  joystick.addEventListener('touchstart', (e) => { e.preventDefault(); onMove(e.touches[0]); }, { passive: false });
+  joystick.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e.touches[0]); }, { passive: false });
+  joystick.addEventListener('touchend', (e) => { e.preventDefault(); centerKnob(); }, { passive: false });
+  joystick.addEventListener('touchcancel', centerKnob, { passive: true });
+}
 
 playBtn.onclick = async () => {
   if (isMobile) {
@@ -149,6 +194,7 @@ const updateMobileAutoShoot = () => {
   const forward = new THREE.Vector3(Math.sin(local.yaw), 0, Math.cos(local.yaw));
   let shouldShoot = false;
   for (const mesh of players.values()) {
+    if (local.team && mesh.userData.team === local.team) continue;
     const toEnemy = new THREE.Vector3().subVectors(mesh.position, local.pos);
     const distance = toEnemy.length();
     if (distance < 4 || distance > 60) continue;
@@ -173,7 +219,11 @@ function tick(dt) {
     local.vel.set(0, 0, 0);
     keys.delete('Mouse0');
   }
-  const dir = new THREE.Vector3((keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), 0, (keys.has('KeyS') ? 1 : 0) - (keys.has('KeyW') ? 1 : 0));
+  const keyX = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+  const keyZ = (keys.has('KeyS') ? 1 : 0) - (keys.has('KeyW') ? 1 : 0);
+  const moveX = isMobile ? keyX + joy.x : keyX;
+  const moveZ = isMobile ? keyZ + joy.y : keyZ;
+  const dir = new THREE.Vector3(moveX, 0, moveZ);
   if (dir.lengthSq()) dir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), local.yaw);
   local.vel.x = THREE.MathUtils.lerp(local.vel.x, dir.x * speed, 0.2);
   local.vel.z = THREE.MathUtils.lerp(local.vel.z, dir.z * speed, 0.2);
