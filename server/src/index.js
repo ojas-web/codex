@@ -96,7 +96,8 @@ const createBot = (index) => {
     pitch: 0,
     velocity: { x: 0, y: 0, z: 0 },
     lastShotMs: 0,
-    lastInputSeq: 0
+    lastInputSeq: 0,
+    respawnAt: 0
   });
 };
 
@@ -133,15 +134,7 @@ const killPlayer = (target, ownerId) => {
     state.score[killer.team]++;
   }
 
-  setTimeout(() => {
-    const current = state.players.get(target.id);
-    if (!current) return;
-    const spawn = randomSpawn(current.team);
-    current.position = { ...spawn };
-    current.hp = MAX_HEALTH;
-    current.ammo = WEAPONS[current.weapon].magazine;
-    current.alive = true;
-  }, RESPAWN_DELAY_MS);
+  target.respawnAt = Date.now() + RESPAWN_DELAY_MS;
 };
 
 const updateBots = () => {
@@ -216,7 +209,8 @@ io.on('connection', (socket) => {
     pitch: 0,
     velocity: { x: 0, y: 0, z: 0 },
     lastShotMs: 0,
-    lastInputSeq: 0
+    lastInputSeq: 0,
+    respawnAt: 0
   };
 
   state.players.set(socket.id, player);
@@ -271,6 +265,18 @@ setInterval(() => {
   }
 
   state.projectiles = state.projectiles.filter((p) => p.ttl > 0);
+
+  for (const p of state.players.values()) {
+    if (!p.alive && p.respawnAt && Date.now() >= p.respawnAt) {
+      const spawn = randomSpawn(p.team);
+      p.position = { ...spawn };
+      p.velocity = { x: 0, y: 0, z: 0 };
+      p.hp = MAX_HEALTH;
+      p.ammo = WEAPONS[p.weapon].magazine;
+      p.respawnAt = 0;
+      p.alive = true;
+    }
+  }
 
   io.emit('snapshot', {
     t: Date.now(),

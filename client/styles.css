@@ -11,3 +11,5 @@ button { padding: .9rem 1.2rem; border: 0; border-radius: 10px; background: line
 .bottombar { bottom: 1rem; }
 #mobileControls { display: none; position: fixed; bottom: 5rem; right: 1rem; gap: .5rem; z-index: 15; }
 @media (max-width: 900px) { #mobileControls { display: flex; } }
+
+#respawn{position:fixed;left:50%;top:18%;transform:translateX(-50%);padding:10px 14px;border:1px solid #ff4d7e;background:#12050acc;color:#ff7aa6;font-weight:700;letter-spacing:1px}.hidden{display:none}

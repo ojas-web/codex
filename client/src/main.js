@@ -9,7 +9,8 @@ const ui = {
   score: document.getElementById('score'),
   health: document.getElementById('health'),
   ammo: document.getElementById('ammo'),
-  kills: document.getElementById('kills')
+  kills: document.getElementById('kills'),
+  respawn: document.getElementById('respawn')
 };
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -51,7 +52,7 @@ scene.add(neonLines);
 
 const keys = new Set();
 let pointerLocked = false;
-const local = { id: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 30, kills: 0, deaths: 0, weapon: 'rifle' };
+const local = { id: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 30, kills: 0, deaths: 0, weapon: 'rifle', alive: true, respawnAt: 0 };
 const players = new Map();
 const projectiles = [];
 let seq = 0;
@@ -61,7 +62,9 @@ socket.on('welcome', ({ id }) => (local.id = id));
 socket.on('snapshot', (snap) => {
   for (const p of snap.players) {
     if (p.id === local.id) {
-      local.hp = p.hp; local.ammo = p.ammo; local.kills = p.kills; local.deaths = p.deaths;
+      local.hp = p.hp; local.ammo = p.ammo; local.kills = p.kills; local.deaths = p.deaths; local.alive = p.alive; local.respawnAt = p.respawnAt || 0;
+      if (!local.alive && p.position) local.pos.set(p.position.x, p.position.y, p.position.z);
+      if (local.alive && p.position) local.pos.lerp(new THREE.Vector3(p.position.x, p.position.y, p.position.z), 0.35);
       continue;
     }
     let m = players.get(p.id);
@@ -110,12 +113,16 @@ document.addEventListener('pointerlockchange', () => { pointerLocked = !!documen
 const tracerMat = new THREE.LineBasicMaterial({ color: 0xffaa22 });
 function tick(dt) {
   const speed = keys.has('ShiftLeft') ? 22 : keys.has('ControlLeft') ? 7 : 14;
+  if (!local.alive) {
+    local.vel.set(0, 0, 0);
+    keys.delete('Mouse0');
+  }
   const dir = new THREE.Vector3((keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0), 0, (keys.has('KeyS') ? 1 : 0) - (keys.has('KeyW') ? 1 : 0));
   if (dir.lengthSq()) dir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), local.yaw);
   local.vel.x = THREE.MathUtils.lerp(local.vel.x, dir.x * speed, 0.2);
   local.vel.z = THREE.MathUtils.lerp(local.vel.z, dir.z * speed, 0.2);
   local.vel.y -= 30 * dt;
-  if (keys.has('Space') && local.pos.y <= 2.01) local.vel.y = 12;
+  if (local.alive && keys.has('Space') && local.pos.y <= 2.01) local.vel.y = 12;
   local.pos.addScaledVector(local.vel, dt);
   if (local.pos.y < 2) { local.pos.y = 2; local.vel.y = 0; }
 
@@ -132,13 +139,20 @@ function tick(dt) {
     velocity: { x: local.vel.x, y: local.vel.y, z: local.vel.z },
     crouch: keys.has('ControlLeft'),
     sprint: keys.has('ShiftLeft'),
-    fire: keys.has('Mouse0'),
+    fire: local.alive && keys.has('Mouse0'),
     weapon: local.weapon
   });
 
   ui.health.textContent = `HP ${Math.max(0, local.hp | 0)}`;
   ui.ammo.textContent = String(local.ammo);
   ui.kills.textContent = `K ${local.kills} / D ${local.deaths}`;
+  if (!local.alive) {
+    const remain = Math.max(0, Math.ceil((local.respawnAt - Date.now()) / 1000));
+    ui.respawn.textContent = `RESPAWNING IN ${remain}s`;
+    ui.respawn.classList.remove('hidden');
+  } else {
+    ui.respawn.classList.add('hidden');
+  }
 
   while (scene.children.find((x) => x.userData.tracer)) scene.remove(scene.children.find((x) => x.userData.tracer));
   for (const p of projectiles.slice(0, 18)) {
