@@ -33,6 +33,9 @@ const BOT_DETECTION_RADIUS = 90;
 const BOT_STOP_DISTANCE = 14;
 const BOT_MOVE_SPEED = 0.28;
 const BOT_FIRE_RANGE = 55;
+const BOT_SEPARATION_RADIUS = 6;
+const BOT_SEPARATION_FORCE = 0.14;
+const BOT_MAX_STEP_PER_TICK = 0.22;
 const HIT_RADIUS = 2.4;
 
 const spawnPoints = {
@@ -134,7 +137,33 @@ const killPlayer = (target, ownerId) => {
     state.score[killer.team]++;
   }
 
+  target.velocity = { x: 0, y: 0, z: 0 };
   target.respawnAt = Date.now() + RESPAWN_DELAY_MS;
+};
+
+
+const keepInsideArena = (entity) => {
+  entity.position.x = Math.max(-92, Math.min(92, entity.position.x));
+  entity.position.z = Math.max(-92, Math.min(92, entity.position.z));
+};
+
+const applyBotSeparation = (bot, bots) => {
+  let pushX = 0;
+  let pushZ = 0;
+  for (const other of bots) {
+    if (other.id === bot.id || !other.alive) continue;
+    const dx = bot.position.x - other.position.x;
+    const dz = bot.position.z - other.position.z;
+    const distSq = dx * dx + dz * dz;
+    if (!distSq || distSq > BOT_SEPARATION_RADIUS * BOT_SEPARATION_RADIUS) continue;
+    const dist = Math.sqrt(distSq);
+    const weight = (BOT_SEPARATION_RADIUS - dist) / BOT_SEPARATION_RADIUS;
+    pushX += (dx / dist) * weight;
+    pushZ += (dz / dist) * weight;
+  }
+
+  bot.position.x += pushX * BOT_SEPARATION_FORCE;
+  bot.position.z += pushZ * BOT_SEPARATION_FORCE;
 };
 
 const updateBots = () => {
@@ -171,13 +200,16 @@ const updateBots = () => {
     bot.pitch = Math.max(-0.6, Math.min(0.6, -Math.atan2(dy, dist)));
 
     if (dist > BOT_STOP_DISTANCE) {
-      const step = Math.min(BOT_MOVE_SPEED, dist - BOT_STOP_DISTANCE);
+      const step = Math.min(BOT_MOVE_SPEED, BOT_MAX_STEP_PER_TICK, dist - BOT_STOP_DISTANCE);
       bot.position.x += (dx / dist) * step;
       bot.position.z += (dz / dist) * step;
       bot.velocity = { x: (dx / dist) * step, y: 0, z: (dz / dist) * step };
     } else {
       bot.velocity = { x: 0, y: 0, z: 0 };
     }
+
+    applyBotSeparation(bot, bots);
+    keepInsideArena(bot);
 
     if (dist <= BOT_FIRE_RANGE) {
       if (bot.ammo <= 0) {
