@@ -55,6 +55,8 @@ let pointerLocked = false;
 const local = { id: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 30, kills: 0, deaths: 0, weapon: 'rifle', alive: true, respawnAt: 0 };
 const players = new Map();
 const projectiles = [];
+const tracerGroup = new THREE.Group();
+scene.add(tracerGroup);
 let seq = 0;
 
 const socket = io();
@@ -64,7 +66,13 @@ socket.on('snapshot', (snap) => {
     if (p.id === local.id) {
       local.hp = p.hp; local.ammo = p.ammo; local.kills = p.kills; local.deaths = p.deaths; local.alive = p.alive; local.respawnAt = p.respawnAt || 0;
       if (!local.alive && p.position) local.pos.set(p.position.x, p.position.y, p.position.z);
-      if (local.alive && p.position) local.pos.lerp(new THREE.Vector3(p.position.x, p.position.y, p.position.z), 0.35);
+      if (local.alive && p.position) {
+        const dx = p.position.x - local.pos.x;
+        const dy = p.position.y - local.pos.y;
+        const dz = p.position.z - local.pos.z;
+        const driftSq = dx * dx + dy * dy + dz * dz;
+        if (driftSq > 64) local.pos.set(p.position.x, p.position.y, p.position.z);
+      }
       continue;
     }
     let m = players.get(p.id);
@@ -154,12 +162,11 @@ function tick(dt) {
     ui.respawn.classList.add('hidden');
   }
 
-  while (scene.children.find((x) => x.userData.tracer)) scene.remove(scene.children.find((x) => x.userData.tracer));
-  for (const p of projectiles.slice(0, 18)) {
+  tracerGroup.clear();
+  for (const p of projectiles.slice(0, 12)) {
     const points = [new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z), new THREE.Vector3(p.pos.x - p.dir.x * 2, p.pos.y - p.dir.y * 2, p.pos.z - p.dir.z * 2)];
     const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), tracerMat);
-    line.userData.tracer = true;
-    scene.add(line);
+    tracerGroup.add(line);
   }
 }
 

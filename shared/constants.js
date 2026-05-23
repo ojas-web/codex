@@ -19,8 +19,8 @@ export const WEAPONS = {
   },
   smg: {
     name: 'SM-9 Pulsar',
-    damage: 4,
-    fireRateMs: 20,
+    damage: 11,
+    fireRateMs: 70,
     magazine: 40,
     reloadMs: 1600,
     spread: 0.02,

@@ -29,10 +29,10 @@ const state = {
   score: { [TEAM_A]: 0, [TEAM_B]: 0 }
 };
 
-const BOT_DETECTION_RADIUS = 67;
+const BOT_DETECTION_RADIUS = 90;
 const BOT_STOP_DISTANCE = 14;
 const BOT_MOVE_SPEED = 0.28;
-const BOT_FIRE_RANGE = 50;
+const BOT_FIRE_RANGE = 55;
 const BOT_SEPARATION_RADIUS = 6;
 const BOT_SEPARATION_FORCE = 0.14;
 const BOT_MAX_STEP_PER_TICK = 0.22;
