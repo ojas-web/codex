@@ -73,11 +73,11 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0xe8f5d9, 0.0012);
+scene.fog = new THREE.FogExp2(0xeff8e6, 0.00085);
 const camera = new THREE.PerspectiveCamera(85, innerWidth / innerHeight, 0.1, 500);
 
-scene.add(new THREE.HemisphereLight(0xeef7ff, 0x9cc47e, 1.25));
-const sun = new THREE.DirectionalLight(0xffffff, 2.1);
+scene.add(new THREE.HemisphereLight(0xf4fbff, 0xb6d38d, 1.45));
+const sun = new THREE.DirectionalLight(0xfffdf2, 2.7);
 sun.position.set(45, 80, 30);
 sun.castShadow = true;
 scene.add(sun);
@@ -325,6 +325,17 @@ if (isMobile) {
   }, { passive: true });
 }
 
+
+if (!isMobile) {
+  canvas.addEventListener('click', async () => {
+    if (!pointerLocked) {
+      await canvas.requestPointerLock();
+      pointerLocked = true;
+      menu.style.display = 'none';
+    }
+  });
+}
+
 addEventListener('mousedown', () => pointerLocked && keys.add('Mouse0'));
 addEventListener('mouseup', () => keys.delete('Mouse0'));
 
@@ -378,9 +389,7 @@ document.addEventListener('pointerlockchange', () => {
     return;
   }
   pointerLocked = !!document.pointerLockElement;
-  if (!pointerLocked) {
-    menu.style.display = 'none';
-  }
+  if (!pointerLocked) menu.style.display = 'none';
 });
 
 
