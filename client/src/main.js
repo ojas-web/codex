@@ -11,7 +11,8 @@ const ui = {
   health: document.getElementById('health'),
   ammo: document.getElementById('ammo'),
   kills: document.getElementById('kills'),
-  respawn: document.getElementById('respawn')
+  respawn: document.getElementById('respawn'),
+  leaderboardList: document.getElementById('leaderboardList')
 };
 
 
@@ -108,6 +109,28 @@ const tracerGroup = new THREE.Group();
 scene.add(tracerGroup);
 let seq = 0;
 
+
+const renderLeaderboard = (playersSnap) => {
+  if (!ui.leaderboardList) return;
+  const sorted = [...playersSnap]
+    .sort((a, b) => (b.kills - a.kills) || (a.deaths - b.deaths) || a.name.localeCompare(b.name))
+    .slice(0, 8);
+
+  ui.leaderboardList.innerHTML = '';
+  for (const p of sorted) {
+    const li = document.createElement('li');
+    if (p.id === local.id) li.classList.add('me');
+    const name = document.createElement('span');
+    const tag = p.bot ? '🤖' : '';
+    name.textContent = `${tag}${p.name}`;
+    const kd = document.createElement('span');
+    kd.textContent = `${p.kills}/${p.deaths}`;
+    li.appendChild(name);
+    li.appendChild(kd);
+    ui.leaderboardList.appendChild(li);
+  }
+};
+
 const socket = io();
 socket.on('welcome', ({ id, team }) => { local.id = id; local.team = team; });
 socket.on('snapshot', (snap) => {
@@ -147,6 +170,7 @@ socket.on('snapshot', (snap) => {
   ui.score.textContent = `A ${snap.score.A} - ${snap.score.B} B`;
   const s = Math.floor(snap.remainingMs / 1000);
   ui.timer.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  renderLeaderboard(snap.players);
 });
 
 
