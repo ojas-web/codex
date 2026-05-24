@@ -14,7 +14,8 @@ const ui = {
   respawn: document.getElementById('respawn'),
   leaderboardList: document.getElementById('leaderboardList'),
   money: document.getElementById('money'),
-  shopItems: document.getElementById('shopItems')
+  shopItems: document.getElementById('shopItems'),
+  gameOver: document.getElementById('gameOverBanner')
 };
 
 
@@ -70,35 +71,47 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x050814, 0.018);
+scene.fog = new THREE.FogExp2(0xb8d7a4, 0.0026);
 const camera = new THREE.PerspectiveCamera(85, innerWidth / innerHeight, 0.1, 500);
 
-scene.add(new THREE.HemisphereLight(0x63a4ff, 0x050507, 0.8));
-const sun = new THREE.DirectionalLight(0x8fd7ff, 1.4);
+scene.add(new THREE.HemisphereLight(0xd9f0ff, 0x6a8b52, 1.05));
+const sun = new THREE.DirectionalLight(0xfff6d5, 1.25);
 sun.position.set(20, 40, 10);
 sun.castShadow = true;
 scene.add(sun);
 
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x131826, metalness: 0.5, roughness: 0.6 }));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(520, 520), new THREE.MeshStandardMaterial({ color: 0x5e8e4b, metalness: 0.02, roughness: 0.95 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-for (let i = 0; i < 80; i++) {
-  const crate = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 6), new THREE.MeshStandardMaterial({ color: i % 2 ? 0x24324a : 0x182030, emissive: i % 5 ? 0 : 0x004455 }));
-  crate.position.set((Math.random() - 0.5) * 160, 3, (Math.random() - 0.5) * 160);
-  crate.castShadow = true;
-  crate.receiveShadow = true;
-  scene.add(crate);
+
+for (let i = 0; i < 240; i++) {
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 6, 8), new THREE.MeshStandardMaterial({ color: 0x6c4b2a, roughness: 1 }));
+  const ang = Math.random() * Math.PI * 2;
+  const radius = 70 + Math.random() * 180;
+  trunk.position.set(Math.cos(ang) * radius, 3, Math.sin(ang) * radius);
+  trunk.castShadow = true;
+  const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.9, 7.5, 10), new THREE.MeshStandardMaterial({ color: 0x356f2f, roughness: 0.9 }));
+  leaves.position.set(0, 5.8, 0);
+  trunk.add(leaves);
+  scene.add(trunk);
 }
 
-const neonLines = new THREE.Group();
-for (let i = 0; i < 40; i++) {
-  const g = new THREE.Mesh(new THREE.BoxGeometry(30, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: i % 2 ? 0x00e6ff : 0xff3bf1 }));
-  g.position.set((Math.random() - 0.5) * 150, 0.2, (Math.random() - 0.5) * 150);
-  neonLines.add(g);
-}
-scene.add(neonLines);
+const boundary = new THREE.Mesh(new THREE.RingGeometry(58, 62, 96), new THREE.MeshBasicMaterial({ color: 0xdad2b2, side: THREE.DoubleSide }));
+boundary.rotation.x = -Math.PI / 2;
+boundary.position.y = 0.12;
+scene.add(boundary);
+
+const house = new THREE.Group();
+const houseBody = new THREE.Mesh(new THREE.BoxGeometry(44, 18, 44), new THREE.MeshStandardMaterial({ color: 0xcbb99f, roughness: 0.9 }));
+houseBody.position.y = 9;
+const roof = new THREE.Mesh(new THREE.ConeGeometry(34, 14, 4), new THREE.MeshStandardMaterial({ color: 0x8f3f2e, roughness: 0.85 }));
+roof.position.y = 24;
+roof.rotation.y = Math.PI / 4;
+house.add(houseBody, roof);
+scene.add(house);
+
 
 const keys = new Set();
 const mobileControls = document.getElementById('mobileControls');
@@ -171,7 +184,12 @@ socket.on('snapshot', (snap) => {
     }
     let m = players.get(p.id);
     if (!m) {
-      m = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.2, 6, 12), new THREE.MeshStandardMaterial({ color: p.team === 'A' ? 0x00e6ff : 0xff408d }));
+      m = new THREE.Group();
+      const isZombie = p.bot;
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.2, 6, 12), new THREE.MeshStandardMaterial({ color: isZombie ? 0x7a9e52 : (p.team === 'A' ? 0x2f5adf : 0xd04444) }));
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 10), new THREE.MeshStandardMaterial({ color: isZombie ? 0xa3b97b : 0xf2d2b6 }));
+      head.position.y = 1.35;
+      m.add(body, head);
       m.castShadow = true; scene.add(m); players.set(p.id, m);
       m.userData.team = p.team;
       const hpBar = createHpBar();
@@ -193,6 +211,12 @@ socket.on('snapshot', (snap) => {
   const s = Math.floor(snap.remainingMs / 1000);
   ui.timer.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   renderLeaderboard(snap.players);
+  if (ui.gameOver) {
+    if (snap.gameOver) {
+      ui.gameOver.textContent = snap.gameOverReason || "GAME OVER";
+      ui.gameOver.classList.remove("hidden");
+    } else ui.gameOver.classList.add("hidden");
+  }
 });
 
 

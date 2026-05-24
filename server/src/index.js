@@ -13,7 +13,8 @@ import {
   WEAPONS,
   STARTING_WEAPON,
   KILL_REWARD,
-  WEAPON_COSTS
+  WEAPON_COSTS,
+  MAP_SIZE
 } from '../../shared/constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,29 +26,27 @@ const io = new Server(httpServer, { cors: { origin: '*' } });
 
 app.use(express.static(path.resolve(__dirname, '../../client')));
 
+const HOUSE_RADIUS = 32;
+const ZOMBIE_MELEE_RANGE = 2.6;
+const ZOMBIE_MELEE_DAMAGE = 12;
+const ZOMBIE_ATTACK_COOLDOWN_MS = 900;
+const ZOMBIE_OBJECTIVE_RADIUS = 24;
+const ZOMBIE_OBJECTIVE_THRESHOLD = 3;
+const MAX_POSITION_DELTA_PER_TICK = 2.6;
+const ARENA_LIMIT = MAP_SIZE / 2 - 8;
+
 const state = {
   startedAt: Date.now(),
   players: new Map(),
   projectiles: [],
-  score: { [TEAM_A]: 0, [TEAM_B]: 0 }
+  score: { [TEAM_A]: 0, [TEAM_B]: 0 },
+  gameOver: false,
+  gameOverReason: ''
 };
 
-const BOT_DETECTION_RADIUS = 90;
-const BOT_STOP_DISTANCE = 14;
-const BOT_MOVE_SPEED = 0.28;
-const BOT_FIRE_RANGE = 70;
-const BOT_SEPARATION_RADIUS = 6;
-const BOT_SEPARATION_FORCE = 0.14;
-const BOT_MAX_STEP_PER_TICK = 0.22;
-const HIT_RADIUS = 3.2;
-const BOT_DAMAGE_MULTIPLIER = 0.45;
-const BOT_MIN_SHOT_INTERVAL_MS = 320;
-const MAX_POSITION_DELTA_PER_TICK = 2.6;
-const ARENA_LIMIT = 96;
-
 const spawnPoints = {
-  [TEAM_A]: [{ x: -60, y: 2, z: -40 }, { x: -50, y: 2, z: 30 }],
-  [TEAM_B]: [{ x: 60, y: 2, z: 40 }, { x: 50, y: 2, z: -30 }]
+  [TEAM_A]: [{ x: -120, y: 2, z: -120 }, { x: -110, y: 2, z: 90 }],
+  [TEAM_B]: [{ x: 120, y: 2, z: 120 }, { x: 110, y: 2, z: -90 }]
 };
 
 const teamForJoin = () => {
@@ -62,13 +61,13 @@ const randomSpawn = (team) => {
   return spots[Math.floor(Math.random() * spots.length)];
 };
 
-
 const canDamage = (attacker, target) => {
   if (!attacker || !target || attacker.id === target.id) return false;
-  if (attacker.bot || target.bot) return true;
+  if (attacker.bot && target.bot) return false;
+  if (attacker.bot) return !target.bot;
+  if (target.bot) return true;
   return attacker.team !== target.team;
 };
-
 
 const clampToArena = (pos) => ({
   x: Math.max(-ARENA_LIMIT, Math.min(ARENA_LIMIT, Number(pos?.x) || 0)),
@@ -99,11 +98,8 @@ const sanitizeInput = (input) => {
       y: Number(input.velocity?.y) || 0,
       z: Number(input.velocity?.z) || 0
     },
-    crouch: !!input.crouch,
-    sprint: !!input.sprint,
     fire: !!input.fire,
-    weapon: WEAPONS[input.weapon] ? input.weapon : STARTING_WEAPON,
-    timestamp: Date.now()
+    weapon: WEAPONS[input.weapon] ? input.weapon : STARTING_WEAPON
   };
 };
 
@@ -114,13 +110,13 @@ const createBot = (index) => {
   state.players.set(id, {
     id,
     bot: true,
-    name: `BOT_${index}`,
+    name: `ZOMBIE_${index}`,
     team,
     alive: true,
     hp: MAX_HEALTH,
     money: 0,
-    ammo: WEAPONS[STARTING_WEAPON].magazine,
-    weapon: STARTING_WEAPON,
+    ammo: 0,
+    weapon: 'fists',
     kills: 0,
     deaths: 0,
     position: { ...spawn },
@@ -128,16 +124,17 @@ const createBot = (index) => {
     pitch: 0,
     velocity: { x: 0, y: 0, z: 0 },
     lastShotMs: 0,
+    lastMeleeMs: 0,
     lastInputSeq: 0,
     respawnAt: 0
   });
 };
 
 const spawnProjectile = (shooter) => {
-  const weapon = WEAPONS[shooter.weapon] || WEAPONS.rifle;
+  if (shooter.bot || shooter.weapon === 'fists') return;
+  const weapon = WEAPONS[shooter.weapon] || WEAPONS[STARTING_WEAPON];
   const now = Date.now();
-  const shotInterval = shooter.bot ? Math.max(weapon.fireRateMs, BOT_MIN_SHOT_INTERVAL_MS) : weapon.fireRateMs;
-  if (shooter.ammo <= 0 || now - shooter.lastShotMs < shotInterval) return;
+  if (shooter.ammo <= 0 || now - shooter.lastShotMs < weapon.fireRateMs) return;
 
   shooter.lastShotMs = now;
   shooter.ammo -= 1;
@@ -152,7 +149,7 @@ const spawnProjectile = (shooter) => {
       y: Math.sin(shooter.pitch) * -1,
       z: Math.cos(shooter.rotationY)
     },
-    dmg: shooter.bot ? Math.max(4, Math.round(weapon.damage * BOT_DAMAGE_MULTIPLIER)) : weapon.damage,
+    dmg: weapon.damage,
     speed: 3,
     ttl: 40
   });
@@ -172,87 +169,97 @@ const killPlayer = (target, ownerId) => {
   target.respawnAt = Date.now() + RESPAWN_DELAY_MS;
 };
 
-
-const keepInsideArena = (entity) => {
-  entity.position.x = Math.max(-92, Math.min(92, entity.position.x));
-  entity.position.z = Math.max(-92, Math.min(92, entity.position.z));
-};
-
-const applyBotSeparation = (bot, bots) => {
-  let pushX = 0;
-  let pushZ = 0;
-  for (const other of bots) {
-    if (other.id === bot.id || !other.alive) continue;
-    const dx = bot.position.x - other.position.x;
-    const dz = bot.position.z - other.position.z;
-    const distSq = dx * dx + dz * dz;
-    if (!distSq || distSq > BOT_SEPARATION_RADIUS * BOT_SEPARATION_RADIUS) continue;
-    const dist = Math.sqrt(distSq);
-    const weight = (BOT_SEPARATION_RADIUS - dist) / BOT_SEPARATION_RADIUS;
-    pushX += (dx / dist) * weight;
-    pushZ += (dz / dist) * weight;
-  }
-
-  bot.position.x += pushX * BOT_SEPARATION_FORCE;
-  bot.position.z += pushZ * BOT_SEPARATION_FORCE;
-};
-
 const updateBots = () => {
   const bots = [...state.players.values()].filter((p) => p.bot && p.alive);
   const aliveTargets = [...state.players.values()].filter((p) => p.alive);
 
   for (const bot of bots) {
     let nearest = null;
-    let nearestSq = BOT_DETECTION_RADIUS * BOT_DETECTION_RADIUS;
+    let nearestSq = Number.MAX_SAFE_INTEGER;
 
     for (const candidate of aliveTargets) {
       if (candidate.id === bot.id || !canDamage(bot, candidate)) continue;
       const dx = candidate.position.x - bot.position.x;
       const dz = candidate.position.z - bot.position.z;
       const distSq = dx * dx + dz * dz;
-      const weightedDistSq = candidate.bot ? distSq * 1.35 : distSq;
-      if (weightedDistSq < nearestSq) {
-        nearestSq = weightedDistSq;
+      if (distSq < nearestSq) {
+        nearestSq = distSq;
         nearest = candidate;
       }
     }
 
-    if (!nearest) {
-      bot.rotationY += 0.03;
-      bot.velocity = { x: 0, y: 0, z: 0 };
-      continue;
-    }
-
-    const dx = nearest.position.x - bot.position.x;
-    const dy = nearest.position.y - bot.position.y;
-    const dz = nearest.position.z - bot.position.z;
+    const targetPos = nearest?.position || { x: 0, y: 2, z: 0 };
+    const dx = targetPos.x - bot.position.x;
+    const dz = targetPos.z - bot.position.z;
     const dist = Math.sqrt(dx * dx + dz * dz) || 0.0001;
-
     bot.rotationY = Math.atan2(dx, dz);
-    bot.pitch = Math.max(-0.6, Math.min(0.6, -Math.atan2(dy, dist)));
 
-    if (dist > BOT_STOP_DISTANCE) {
-      const step = Math.min(BOT_MOVE_SPEED, BOT_MAX_STEP_PER_TICK, dist - BOT_STOP_DISTANCE);
-      bot.position.x += (dx / dist) * step;
-      bot.position.z += (dz / dist) * step;
-      bot.velocity = { x: (dx / dist) * step, y: 0, z: (dz / dist) * step };
-    } else {
-      bot.velocity = { x: 0, y: 0, z: 0 };
-    }
+    const speed = nearest ? 0.35 : 0.22;
+    bot.position.x += (dx / dist) * Math.min(speed, dist);
+    bot.position.z += (dz / dist) * Math.min(speed, dist);
 
-    applyBotSeparation(bot, bots);
-    keepInsideArena(bot);
-
-    if (dist <= BOT_FIRE_RANGE) {
-      if (bot.ammo <= 0) {
-        bot.ammo = WEAPONS[bot.weapon].magazine;
+    if (nearest && dist <= ZOMBIE_MELEE_RANGE) {
+      const now = Date.now();
+      if (now - bot.lastMeleeMs >= ZOMBIE_ATTACK_COOLDOWN_MS) {
+        bot.lastMeleeMs = now;
+        nearest.hp -= ZOMBIE_MELEE_DAMAGE;
+        if (nearest.hp <= 0) killPlayer(nearest, bot.id);
       }
-      spawnProjectile(bot);
     }
   }
 };
 
-for (let i = 0; i < 4; i++) createBot(i + 1);
+const checkObjectiveFailure = () => {
+  const zombiesInHouse = [...state.players.values()].filter((p) => p.bot && p.alive).filter((z) => {
+    const dx = z.position.x;
+    const dz = z.position.z;
+    return dx * dx + dz * dz <= ZOMBIE_OBJECTIVE_RADIUS * ZOMBIE_OBJECTIVE_RADIUS;
+  }).length;
+
+  if (zombiesInHouse >= ZOMBIE_OBJECTIVE_THRESHOLD && !state.gameOver) {
+    state.gameOver = true;
+    state.gameOverReason = 'Zombies reached the house. Restarting match...';
+    setTimeout(restartMatch, 3500);
+  }
+};
+
+const restartMatch = () => {
+  state.projectiles = [];
+  state.score = { [TEAM_A]: 0, [TEAM_B]: 0 };
+  state.startedAt = Date.now();
+  state.gameOver = false;
+  state.gameOverReason = '';
+
+  let botIndex = 1;
+  for (const p of state.players.values()) {
+    if (p.bot) {
+      const team = botIndex % 2 ? TEAM_A : TEAM_B;
+      const spawn = randomSpawn(team);
+      p.team = team;
+      p.position = { ...spawn };
+      p.hp = MAX_HEALTH;
+      p.alive = true;
+      p.kills = 0;
+      p.deaths = 0;
+      p.weapon = 'fists';
+      botIndex++;
+      continue;
+    }
+
+    const spawn = randomSpawn(p.team);
+    p.position = { ...spawn };
+    p.hp = MAX_HEALTH;
+    p.alive = true;
+    p.kills = 0;
+    p.deaths = 0;
+    p.money = 0;
+    p.weapon = STARTING_WEAPON;
+    p.ammo = WEAPONS[STARTING_WEAPON].magazine;
+    p.respawnAt = 0;
+  }
+};
+
+for (let i = 0; i < 6; i++) createBot(i + 1);
 
 io.on('connection', (socket) => {
   const team = teamForJoin();
@@ -284,20 +291,17 @@ io.on('connection', (socket) => {
   socket.on('input', (rawInput) => {
     const input = sanitizeInput(rawInput);
     const p = state.players.get(socket.id);
-    if (!p || !p.alive || !input) return;
+    if (!p || !p.alive || !input || state.gameOver) return;
     const clampedPos = clampToArena(input.pos);
     if (isReasonableMove(p.position, clampedPos)) p.position = clampedPos;
     p.rotationY = input.rotY;
     p.pitch = input.pitch;
     p.velocity = input.velocity;
     p.lastInputSeq = input.seq;
-    p.weapon = input.weapon;
 
-    if (input.fire) {
-      spawnProjectile(p);
-    }
+    if (WEAPONS[input.weapon]) p.weapon = input.weapon;
+    if (input.fire) spawnProjectile(p);
   });
-
 
   socket.on('buyWeapon', (weaponKey) => {
     const p = state.players.get(socket.id);
@@ -311,7 +315,7 @@ io.on('connection', (socket) => {
 
   socket.on('reload', () => {
     const p = state.players.get(socket.id);
-    if (!p) return;
+    if (!p || !WEAPONS[p.weapon]) return;
     p.ammo = WEAPONS[p.weapon].magazine;
   });
 
@@ -319,41 +323,43 @@ io.on('connection', (socket) => {
 });
 
 setInterval(() => {
-  updateBots();
+  if (!state.gameOver) {
+    updateBots();
 
-  for (const proj of state.projectiles) {
-    proj.pos.x += proj.dir.x * proj.speed;
-    proj.pos.y += proj.dir.y * proj.speed;
-    proj.pos.z += proj.dir.z * proj.speed;
-    proj.ttl -= 1;
-    for (const target of state.players.values()) {
-      const owner = state.players.get(proj.owner);
-      if (!target.alive || !canDamage(owner, target)) continue;
-      const dx = proj.pos.x - target.position.x;
-      const dy = proj.pos.y - target.position.y;
-      const dz = proj.pos.z - target.position.z;
-      if (dx * dx + dy * dy + dz * dz <= HIT_RADIUS * HIT_RADIUS) {
-        target.hp -= proj.dmg;
-        proj.ttl = 0;
-        if (target.hp <= 0) {
-          killPlayer(target, proj.owner);
+    for (const proj of state.projectiles) {
+      proj.pos.x += proj.dir.x * proj.speed;
+      proj.pos.y += proj.dir.y * proj.speed;
+      proj.pos.z += proj.dir.z * proj.speed;
+      proj.ttl -= 1;
+      for (const target of state.players.values()) {
+        const owner = state.players.get(proj.owner);
+        if (!target.alive || !canDamage(owner, target)) continue;
+        const dx = proj.pos.x - target.position.x;
+        const dy = proj.pos.y - target.position.y;
+        const dz = proj.pos.z - target.position.z;
+        if (dx * dx + dy * dy + dz * dz <= 3.2 * 3.2) {
+          target.hp -= proj.dmg;
+          proj.ttl = 0;
+          if (target.hp <= 0) killPlayer(target, proj.owner);
         }
       }
     }
-  }
 
-  state.projectiles = state.projectiles.filter((p) => p.ttl > 0);
+    state.projectiles = state.projectiles.filter((p) => p.ttl > 0);
 
-  for (const p of state.players.values()) {
-    if (!p.alive && p.respawnAt && Date.now() >= p.respawnAt) {
-      const spawn = randomSpawn(p.team);
-      p.position = { ...spawn };
-      p.velocity = { x: 0, y: 0, z: 0 };
-      p.hp = MAX_HEALTH;
-      p.ammo = WEAPONS[p.weapon].magazine;
-      p.respawnAt = 0;
-      p.alive = true;
+    for (const p of state.players.values()) {
+      if (!p.alive && p.respawnAt && Date.now() >= p.respawnAt) {
+        const spawn = randomSpawn(p.team);
+        p.position = { ...spawn };
+        p.velocity = { x: 0, y: 0, z: 0 };
+        p.hp = MAX_HEALTH;
+        p.ammo = WEAPONS[p.weapon]?.magazine || 0;
+        p.respawnAt = 0;
+        p.alive = true;
+      }
     }
+
+    checkObjectiveFailure();
   }
 
   io.emit('snapshot', {
@@ -361,10 +367,13 @@ setInterval(() => {
     remainingMs: Math.max(0, MATCH_LENGTH_MS - (Date.now() - state.startedAt)),
     players: [...state.players.values()],
     projectiles: state.projectiles,
-    score: state.score
+    score: state.score,
+    gameOver: state.gameOver,
+    gameOverReason: state.gameOverReason,
+    objective: { houseRadius: HOUSE_RADIUS }
   });
 }, 1000 / TICK_RATE);
 
 httpServer.listen(process.env.PORT || 3000, () => {
-  console.log('Neon Strike Arena server on http://localhost:3000');
+  console.log('Survival server on http://localhost:3000');
 });

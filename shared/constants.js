@@ -1,5 +1,5 @@
 export const TICK_RATE = 30;
-export const MAP_SIZE = 180;
+export const MAP_SIZE = 480;
 export const TEAM_A = 'A';
 export const TEAM_B = 'B';
 export const MAX_HEALTH = 100;
@@ -21,7 +21,7 @@ export const WEAPONS = {
     range: 100
   },
   rifle: {
-    name: 'VX-7 Rifle',
+    name: 'Rifle',
     damage: 18,
     fireRateMs: 100,
     magazine: 30,
@@ -31,7 +31,7 @@ export const WEAPONS = {
     range: 160
   },
   smg: {
-    name: 'SM-9 Pulsar',
+    name: 'SMG',
     damage: 11,
     fireRateMs: 70,
     magazine: 40,
@@ -41,7 +41,7 @@ export const WEAPONS = {
     range: 100
   },
   sniper: {
-    name: 'Lancer 88',
+    name: 'Sniper',
     damage: 80,
     fireRateMs: 950,
     magazine: 6,
@@ -51,6 +51,5 @@ export const WEAPONS = {
     range: 280
   }
 };
-
 
 export const WEAPON_COSTS = { pistol: 0, rifle: 120, smg: 90, sniper: 180 };
