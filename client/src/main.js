@@ -186,19 +186,37 @@ socket.on('snapshot', (snap) => {
     if (!m) {
       m = new THREE.Group();
       const isZombie = p.bot;
-      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.2, 6, 12), new THREE.MeshStandardMaterial({ color: isZombie ? 0x7a9e52 : (p.team === 'A' ? 0x2f5adf : 0xd04444) }));
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 10), new THREE.MeshStandardMaterial({ color: isZombie ? 0xa3b97b : 0xf2d2b6 }));
-      head.position.y = 1.35;
-      const limbMat = new THREE.MeshStandardMaterial({ color: isZombie ? 0x6f8d49 : 0x31566c });
-      const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.55, 6, 8), limbMat);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: isZombie ? 0x5f7a46 : (p.team === 'A' ? 0x2f5adf : 0xd04444), roughness: 0.85, metalness: 0.05 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: isZombie ? 0x98b37a : 0xf2d2b6, roughness: 0.9, metalness: 0 });
+      const limbMat = new THREE.MeshStandardMaterial({ color: isZombie ? 0x4b6536 : 0x31566c, roughness: 0.9, metalness: 0.02 });
+
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.72, 1.35, 8, 14), bodyMat);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.46, 14, 14), skinMat);
+      head.position.y = 1.45;
+      const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.18, 0.46), skinMat);
+      jaw.position.set(0, 1.15, 0.22);
+
+      const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.72, 6, 10), limbMat);
       const armR = armL.clone();
-      armL.position.set(-0.75, 0.55, 0);
-      armR.position.set(0.75, 0.55, 0);
-      const legL = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.7, 6, 8), limbMat);
+      armL.position.set(-0.74, 0.58, 0.03);
+      armR.position.set(0.74, 0.58, 0.03);
+      armL.rotation.z = 0.18;
+      armR.rotation.z = -0.18;
+
+      const legL = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.86, 6, 10), limbMat);
       const legR = legL.clone();
-      legL.position.set(-0.3, -1.05, 0);
-      legR.position.set(0.3, -1.05, 0);
-      m.add(body, head, armL, armR, legL, legR);
+      legL.position.set(-0.28, -1.05, 0.02);
+      legR.position.set(0.28, -1.05, 0.02);
+
+      m.add(body, head, jaw, armL, armR, legL, legR);
+      if (isZombie) {
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff5f73 });
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat);
+        const eyeR = eyeL.clone();
+        eyeL.position.set(-0.14, 1.48, 0.38);
+        eyeR.position.set(0.14, 1.48, 0.38);
+        m.add(eyeL, eyeR);
+      }
       m.castShadow = true; scene.add(m); players.set(p.id, m);
       m.userData.team = p.team;
       const hpBar = createHpBar();

@@ -26,9 +26,9 @@ const io = new Server(httpServer, { cors: { origin: '*' } });
 
 app.use(express.static(path.resolve(__dirname, '../../client')));
 
-const HOUSE_RADIUS = 50;
+const HOUSE_RADIUS = 32;
 const ZOMBIE_MELEE_RANGE = 2.6;
-const ZOMBIE_MELEE_DAMAGE = 5;
+const ZOMBIE_MELEE_DAMAGE = 12;
 const ZOMBIE_ATTACK_COOLDOWN_MS = 900;
 const ZOMBIE_OBJECTIVE_RADIUS = 24;
 const ZOMBIE_OBJECTIVE_THRESHOLD = 3;
