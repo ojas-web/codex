@@ -45,8 +45,8 @@ const state = {
 };
 
 const spawnPoints = {
-  [TEAM_A]: [{ x: -120, y: 2, z: -120 }, { x: -110, y: 2, z: 90 }],
-  [TEAM_B]: [{ x: 120, y: 2, z: 120 }, { x: 110, y: 2, z: -90 }]
+  [TEAM_A]: [{ x: -54, y: 2, z: -46 }, { x: -48, y: 2, z: 38 }],
+  [TEAM_B]: [{ x: 54, y: 2, z: 46 }, { x: 48, y: 2, z: -38 }]
 };
 
 const teamForJoin = () => {
@@ -151,7 +151,7 @@ const spawnProjectile = (shooter) => {
     },
     dmg: weapon.damage,
     speed: 3,
-    ttl: 40
+    ttl: Math.max(18, Math.round(weapon.range / 3))
   });
 };
 
@@ -299,7 +299,6 @@ io.on('connection', (socket) => {
     p.velocity = input.velocity;
     p.lastInputSeq = input.seq;
 
-    if (WEAPONS[input.weapon]) p.weapon = input.weapon;
     if (input.fire) spawnProjectile(p);
   });
 

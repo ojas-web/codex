@@ -71,12 +71,12 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0xb8d7a4, 0.0026);
+scene.fog = new THREE.FogExp2(0xd7e8bf, 0.0017);
 const camera = new THREE.PerspectiveCamera(85, innerWidth / innerHeight, 0.1, 500);
 
-scene.add(new THREE.HemisphereLight(0xd9f0ff, 0x6a8b52, 1.05));
-const sun = new THREE.DirectionalLight(0xfff6d5, 1.25);
-sun.position.set(20, 40, 10);
+scene.add(new THREE.HemisphereLight(0xeef7ff, 0x9cc47e, 1.25));
+const sun = new THREE.DirectionalLight(0xfff7df, 1.8);
+sun.position.set(45, 80, 30);
 sun.castShadow = true;
 scene.add(sun);
 
@@ -189,7 +189,16 @@ socket.on('snapshot', (snap) => {
       const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.2, 6, 12), new THREE.MeshStandardMaterial({ color: isZombie ? 0x7a9e52 : (p.team === 'A' ? 0x2f5adf : 0xd04444) }));
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 10), new THREE.MeshStandardMaterial({ color: isZombie ? 0xa3b97b : 0xf2d2b6 }));
       head.position.y = 1.35;
-      m.add(body, head);
+      const limbMat = new THREE.MeshStandardMaterial({ color: isZombie ? 0x6f8d49 : 0x31566c });
+      const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.55, 6, 8), limbMat);
+      const armR = armL.clone();
+      armL.position.set(-0.75, 0.55, 0);
+      armR.position.set(0.75, 0.55, 0);
+      const legL = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.7, 6, 8), limbMat);
+      const legR = legL.clone();
+      legL.position.set(-0.3, -1.05, 0);
+      legR.position.set(0.3, -1.05, 0);
+      m.add(body, head, armL, armR, legL, legR);
       m.castShadow = true; scene.add(m); players.set(p.id, m);
       m.userData.team = p.team;
       const hpBar = createHpBar();
@@ -227,7 +236,10 @@ if (isMobile) {
 }
 
 addEventListener('keydown', (e) => keys.add(e.code));
-addEventListener('keyup', (e) => keys.delete(e.code));
+addEventListener('keyup', (e) => {
+  keys.delete(e.code);
+  if (e.code === 'KeyR') socket.emit('reload');
+});
 addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
   local.yaw -= e.movementX * 0.0022;
