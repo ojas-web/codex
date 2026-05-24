@@ -46,9 +46,14 @@ const state = {
   gameOverReason: ''
 };
 
-const spawnPoints = {
+const playerSpawnPoints = {
   [TEAM_A]: [{ x: -10, y: 2, z: -8 }, { x: -7, y: 2, z: 9 }],
   [TEAM_B]: [{ x: 10, y: 2, z: 8 }, { x: 7, y: 2, z: -9 }]
+};
+
+const botSpawnPoints = {
+  [TEAM_A]: [{ x: -178, y: 2, z: -146 }, { x: -162, y: 2, z: 132 }, { x: -146, y: 2, z: 168 }],
+  [TEAM_B]: [{ x: 178, y: 2, z: 146 }, { x: 162, y: 2, z: -132 }, { x: 146, y: 2, z: -168 }]
 };
 
 const teamForJoin = () => {
@@ -58,8 +63,8 @@ const teamForJoin = () => {
   return a <= b ? TEAM_A : TEAM_B;
 };
 
-const randomSpawn = (team) => {
-  const spots = spawnPoints[team];
+const randomSpawn = (team, forBot = false) => {
+  const spots = (forBot ? botSpawnPoints : playerSpawnPoints)[team];
   return spots[Math.floor(Math.random() * spots.length)];
 };
 
@@ -107,7 +112,7 @@ const sanitizeInput = (input) => {
 
 const createBot = (index) => {
   const team = index % 2 ? TEAM_A : TEAM_B;
-  const spawn = randomSpawn(team);
+  const spawn = randomSpawn(team, true);
   const id = `bot-${index}`;
   state.players.set(id, {
     id,
@@ -236,7 +241,7 @@ const restartMatch = () => {
   for (const p of state.players.values()) {
     if (p.bot) {
       const team = botIndex % 2 ? TEAM_A : TEAM_B;
-      const spawn = randomSpawn(team);
+      const spawn = randomSpawn(team, true);
       p.team = team;
       p.position = { ...spawn };
       p.hp = MAX_HEALTH;
