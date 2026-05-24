@@ -1,5 +1,4 @@
 import * as THREE from 'https://unpkg.com/three@0.176.0/build/three.module.js';
-import { CSS2DRenderer, CSS2DObject } from 'https://unpkg.com/three@0.176.0/examples/jsm/renderers/CSS2DRenderer.js';
 import { io } from 'https://cdn.socket.io/4.8.1/socket.io.esm.min.js';
 
 const canvas = document.getElementById('game');
@@ -16,48 +15,52 @@ const ui = {
 };
 
 
+
+const createHpBarTexture = () => {
+  const w = 128;
+  const h = 24;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const draw = (hp01 = 1) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(32, 6, 14, 0.85)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#ff6b90';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, w - 2, h - 2);
+
+    const fillW = Math.max(0, Math.min(w - 6, (w - 6) * hp01));
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, '#ff5d84');
+    grad.addColorStop(1, '#5dff9f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(3, 3, fillW, h - 6);
+  };
+
+  draw(1);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return { texture, draw };
+};
+
 const createHpBar = () => {
-  const barWrap = document.createElement('div');
-  barWrap.style.position = 'absolute';
-  barWrap.style.width = '46px';
-  barWrap.style.height = '6px';
-  barWrap.style.background = '#25080f';
-  barWrap.style.border = '1px solid #ff6b90';
-  barWrap.style.borderRadius = '4px';
-  barWrap.style.overflow = 'hidden';
-
-  const fill = document.createElement('div');
-  fill.style.width = '100%';
-  fill.style.height = '100%';
-  fill.style.background = 'linear-gradient(90deg,#ff5d84,#5dff9f)';
-  barWrap.appendChild(fill);
-
-  const label = document.createElement('div');
-  label.style.position = 'absolute';
-  label.style.top = '-14px';
-  label.style.left = '50%';
-  label.style.transform = 'translateX(-50%)';
-  label.style.fontSize = '9px';
-  label.style.color = '#dffcff';
-  label.style.textShadow = '0 0 6px #00e5ff';
-  label.textContent = 'ZMB';
-  barWrap.appendChild(label);
-
-  const sprite = new CSS2DObject(barWrap);
-  sprite.position.set(0, 2.2, 0);
-  sprite.userData.fill = fill;
+  const { texture, draw } = createHpBarTexture();
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.position.set(0, 2.6, 0);
+  sprite.scale.set(1.2, 0.26, 1);
+  sprite.userData.updateHp = (hp01) => {
+    draw(hp01);
+    texture.needsUpdate = true;
+  };
   return sprite;
 };
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-const labelRenderer = new CSS2DRenderer();
-labelRenderer.setSize(innerWidth, innerHeight);
-labelRenderer.domElement.style.position = 'fixed';
-labelRenderer.domElement.style.top = '0';
-labelRenderer.domElement.style.left = '0';
-labelRenderer.domElement.style.pointerEvents = 'none';
-labelRenderer.domElement.style.zIndex = '12';
-document.body.appendChild(labelRenderer.domElement);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -131,9 +134,9 @@ socket.on('snapshot', (snap) => {
       m.userData.hpBar = hpBar;
     }
     m.visible = !!p.alive;
-    if (m.userData.hpBar?.userData?.fill) {
+    if (m.userData.hpBar?.userData?.updateHp) {
       const hp01 = Math.max(0, Math.min(1, (p.hp || 0) / ui.maxHp));
-      m.userData.hpBar.userData.fill.style.width = `${Math.round(hp01 * 100)}%`;
+      m.userData.hpBar.userData.updateHp(hp01);
     }
     m.position.lerp(new THREE.Vector3(p.position.x, p.position.y, p.position.z), 0.45);
   }
@@ -164,7 +167,6 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  labelRenderer.setSize(innerWidth, innerHeight);
 });
 
 if (isMobile) {
@@ -329,6 +331,5 @@ let last = performance.now();
   last = now;
   tick(dt);
   renderer.render(scene, camera);
-  labelRenderer.render(scene, camera);
   requestAnimationFrame(loop);
 })(last);
