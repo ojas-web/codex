@@ -187,7 +187,8 @@ document.addEventListener('pointerlockchange', () => {
 
 
 const updateMobileAutoShoot = () => {
-  if (!isMobile || !local.alive) {
+  if (!isMobile) return;
+  if (!local.alive) {
     if (!touchShootActive) keys.delete('Mouse0');
     return;
   }
