@@ -32,11 +32,11 @@ const state = {
 const BOT_DETECTION_RADIUS = 90;
 const BOT_STOP_DISTANCE = 14;
 const BOT_MOVE_SPEED = 0.28;
-const BOT_FIRE_RANGE = 55;
+const BOT_FIRE_RANGE = 70;
 const BOT_SEPARATION_RADIUS = 6;
 const BOT_SEPARATION_FORCE = 0.14;
 const BOT_MAX_STEP_PER_TICK = 0.22;
-const HIT_RADIUS = 2.4;
+const HIT_RADIUS = 3.2;
 
 const spawnPoints = {
   [TEAM_A]: [{ x: -60, y: 2, z: -40 }, { x: -50, y: 2, z: 30 }],

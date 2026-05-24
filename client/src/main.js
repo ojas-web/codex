@@ -132,8 +132,8 @@ if (isMobile) {
 addEventListener('mousedown', () => pointerLocked && keys.add('Mouse0'));
 addEventListener('mouseup', () => keys.delete('Mouse0'));
 
-document.getElementById('shootBtn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.add('Mouse0'); }, { passive: false });
-document.getElementById('shootBtn').addEventListener('touchend', (e) => { e.preventDefault(); keys.delete('Mouse0'); }, { passive: false });
+document.getElementById('shootBtn').addEventListener('touchstart', (e) => { e.preventDefault(); touchShootActive = true; keys.add('Mouse0'); }, { passive: false });
+document.getElementById('shootBtn').addEventListener('touchend', (e) => { e.preventDefault(); touchShootActive = false; keys.delete('Mouse0'); }, { passive: false });
 document.getElementById('jumpBtn').addEventListener('touchstart', (e) => { e.preventDefault(); keys.add('Space'); setTimeout(() => keys.delete('Space'), 140); }, { passive: false });
 document.getElementById('jumpBtn').addEventListener('touchend', (e) => { e.preventDefault(); keys.delete('Space'); }, { passive: false });
 
@@ -141,6 +141,7 @@ document.getElementById('jumpBtn').addEventListener('touchend', (e) => { e.preve
 const joystick = document.getElementById('joystick');
 const joyKnob = document.getElementById('joyKnob');
 const joy = { x: 0, y: 0, active: false };
+let touchShootActive = false;
 if (isMobile && joystick && joyKnob) {
   const maxR = 33;
   const centerKnob = () => { joyKnob.style.left = '33px'; joyKnob.style.top = '33px'; joy.x = 0; joy.y = 0; joy.active = false; };
@@ -187,7 +188,7 @@ document.addEventListener('pointerlockchange', () => {
 
 const updateMobileAutoShoot = () => {
   if (!isMobile || !local.alive) {
-    keys.delete('Mouse0');
+    if (!touchShootActive) keys.delete('Mouse0');
     return;
   }
 
@@ -207,7 +208,7 @@ const updateMobileAutoShoot = () => {
     }
   }
 
-  if (shouldShoot) keys.add('Mouse0');
+  if (shouldShoot || touchShootActive) keys.add('Mouse0');
   else keys.delete('Mouse0');
 };
 
