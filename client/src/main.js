@@ -1,10 +1,12 @@
 import * as THREE from 'https://unpkg.com/three@0.176.0/build/three.module.js';
+import { CSS2DRenderer, CSS2DObject } from 'https://unpkg.com/three@0.176.0/examples/jsm/renderers/CSS2DRenderer.js';
 import { io } from 'https://cdn.socket.io/4.8.1/socket.io.esm.min.js';
 
 const canvas = document.getElementById('game');
 const menu = document.getElementById('menu');
 const playBtn = document.getElementById('playBtn');
 const ui = {
+  maxHp: 100,
   timer: document.getElementById('timer'),
   score: document.getElementById('score'),
   health: document.getElementById('health'),
@@ -13,7 +15,49 @@ const ui = {
   respawn: document.getElementById('respawn')
 };
 
+
+const createHpBar = () => {
+  const barWrap = document.createElement('div');
+  barWrap.style.position = 'absolute';
+  barWrap.style.width = '46px';
+  barWrap.style.height = '6px';
+  barWrap.style.background = '#25080f';
+  barWrap.style.border = '1px solid #ff6b90';
+  barWrap.style.borderRadius = '4px';
+  barWrap.style.overflow = 'hidden';
+
+  const fill = document.createElement('div');
+  fill.style.width = '100%';
+  fill.style.height = '100%';
+  fill.style.background = 'linear-gradient(90deg,#ff5d84,#5dff9f)';
+  barWrap.appendChild(fill);
+
+  const label = document.createElement('div');
+  label.style.position = 'absolute';
+  label.style.top = '-14px';
+  label.style.left = '50%';
+  label.style.transform = 'translateX(-50%)';
+  label.style.fontSize = '9px';
+  label.style.color = '#dffcff';
+  label.style.textShadow = '0 0 6px #00e5ff';
+  label.textContent = 'ZMB';
+  barWrap.appendChild(label);
+
+  const sprite = new CSS2DObject(barWrap);
+  sprite.position.set(0, 2.2, 0);
+  sprite.userData.fill = fill;
+  return sprite;
+};
+
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.style.position = 'fixed';
+labelRenderer.domElement.style.top = '0';
+labelRenderer.domElement.style.left = '0';
+labelRenderer.domElement.style.pointerEvents = 'none';
+labelRenderer.domElement.style.zIndex = '12';
+document.body.appendChild(labelRenderer.domElement);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -82,6 +126,14 @@ socket.on('snapshot', (snap) => {
       m = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.2, 6, 12), new THREE.MeshStandardMaterial({ color: p.team === 'A' ? 0x00e6ff : 0xff408d }));
       m.castShadow = true; scene.add(m); players.set(p.id, m);
       m.userData.team = p.team;
+      const hpBar = createHpBar();
+      m.add(hpBar);
+      m.userData.hpBar = hpBar;
+    }
+    m.visible = !!p.alive;
+    if (m.userData.hpBar?.userData?.fill) {
+      const hp01 = Math.max(0, Math.min(1, (p.hp || 0) / ui.maxHp));
+      m.userData.hpBar.userData.fill.style.width = `${Math.round(hp01 * 100)}%`;
     }
     m.position.lerp(new THREE.Vector3(p.position.x, p.position.y, p.position.z), 0.45);
   }
@@ -112,6 +164,7 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
 });
 
 if (isMobile) {
@@ -276,5 +329,6 @@ let last = performance.now();
   last = now;
   tick(dt);
   renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
   requestAnimationFrame(loop);
 })(last);
