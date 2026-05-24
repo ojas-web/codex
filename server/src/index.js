@@ -10,7 +10,10 @@ import {
   TEAM_A,
   TEAM_B,
   TICK_RATE,
-  WEAPONS
+  WEAPONS,
+  STARTING_WEAPON,
+  KILL_REWARD,
+  WEAPON_COSTS
 } from '../../shared/constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -99,7 +102,7 @@ const sanitizeInput = (input) => {
     crouch: !!input.crouch,
     sprint: !!input.sprint,
     fire: !!input.fire,
-    weapon: WEAPONS[input.weapon] ? input.weapon : 'rifle',
+    weapon: WEAPONS[input.weapon] ? input.weapon : STARTING_WEAPON,
     timestamp: Date.now()
   };
 };
@@ -115,8 +118,9 @@ const createBot = (index) => {
     team,
     alive: true,
     hp: MAX_HEALTH,
-    ammo: WEAPONS.rifle.magazine,
-    weapon: 'rifle',
+    money: 0,
+    ammo: WEAPONS[STARTING_WEAPON].magazine,
+    weapon: STARTING_WEAPON,
     kills: 0,
     deaths: 0,
     position: { ...spawn },
@@ -160,6 +164,7 @@ const killPlayer = (target, ownerId) => {
   const killer = state.players.get(ownerId);
   if (killer) {
     killer.kills++;
+    if (!killer.bot) killer.money = (killer.money || 0) + KILL_REWARD;
     state.score[killer.team]++;
   }
 
@@ -259,8 +264,9 @@ io.on('connection', (socket) => {
     team,
     alive: true,
     hp: MAX_HEALTH,
-    ammo: WEAPONS.rifle.magazine,
-    weapon: 'rifle',
+    money: 0,
+    ammo: WEAPONS[STARTING_WEAPON].magazine,
+    weapon: STARTING_WEAPON,
     kills: 0,
     deaths: 0,
     position: { ...spawn },
@@ -290,6 +296,17 @@ io.on('connection', (socket) => {
     if (input.fire) {
       spawnProjectile(p);
     }
+  });
+
+
+  socket.on('buyWeapon', (weaponKey) => {
+    const p = state.players.get(socket.id);
+    if (!p || p.bot || !WEAPONS[weaponKey]) return;
+    const cost = WEAPON_COSTS[weaponKey] ?? Number.MAX_SAFE_INTEGER;
+    if ((p.money || 0) < cost) return;
+    p.money -= cost;
+    p.weapon = weaponKey;
+    p.ammo = WEAPONS[weaponKey].magazine;
   });
 
   socket.on('reload', () => {

@@ -12,7 +12,9 @@ const ui = {
   ammo: document.getElementById('ammo'),
   kills: document.getElementById('kills'),
   respawn: document.getElementById('respawn'),
-  leaderboardList: document.getElementById('leaderboardList')
+  leaderboardList: document.getElementById('leaderboardList'),
+  money: document.getElementById('money'),
+  shopItems: document.getElementById('shopItems')
 };
 
 
@@ -102,7 +104,7 @@ const keys = new Set();
 const mobileControls = document.getElementById('mobileControls');
 const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints || 0) > 1;
 let pointerLocked = false;
-const local = { id: null, team: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 30, kills: 0, deaths: 0, weapon: 'rifle', alive: true, respawnAt: 0 };
+const local = { id: null, team: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 10, money: 0, kills: 0, deaths: 0, weapon: 'pistol', alive: true, respawnAt: 0 };
 const players = new Map();
 const projectiles = [];
 const tracerGroup = new THREE.Group();
@@ -131,12 +133,32 @@ const renderLeaderboard = (playersSnap) => {
   }
 };
 
+
+const shopConfig = [
+  { key: 'pistol', label: 'Basic Pistol', cost: 0 },
+  { key: 'smg', label: 'SMG', cost: 90 },
+  { key: 'rifle', label: 'Rifle', cost: 120 },
+  { key: 'sniper', label: 'Sniper', cost: 180 }
+];
+
+const renderShop = () => {
+  if (!ui.shopItems) return;
+  ui.shopItems.innerHTML = '';
+  for (const item of shopConfig) {
+    const btn = document.createElement('button');
+    btn.textContent = `${item.label} - $${item.cost}`;
+    btn.disabled = local.money < item.cost || local.weapon === item.key;
+    btn.onclick = () => socket.emit('buyWeapon', item.key);
+    ui.shopItems.appendChild(btn);
+  }
+};
+
 const socket = io();
 socket.on('welcome', ({ id, team }) => { local.id = id; local.team = team; });
 socket.on('snapshot', (snap) => {
   for (const p of snap.players) {
     if (p.id === local.id) {
-      local.hp = p.hp; local.ammo = p.ammo; local.kills = p.kills; local.deaths = p.deaths; local.alive = p.alive; local.respawnAt = p.respawnAt || 0;
+      local.hp = p.hp; local.ammo = p.ammo; local.money = p.money || 0; local.kills = p.kills; local.deaths = p.deaths; local.weapon = p.weapon; local.alive = p.alive; local.respawnAt = p.respawnAt || 0;
       if (!local.alive && p.position) local.pos.set(p.position.x, p.position.y, p.position.z);
       if (local.alive && p.position) {
         const dx = p.position.x - local.pos.x;
@@ -358,6 +380,8 @@ function tick(dt) {
   ui.health.textContent = `HP ${Math.max(0, local.hp | 0)}`;
   ui.ammo.textContent = String(local.ammo);
   ui.kills.textContent = `K ${local.kills} / D ${local.deaths}`;
+  if (ui.money) ui.money.textContent = `$${local.money}`;
+  renderShop();
   if (!local.alive) {
     const remain = Math.max(0, Math.ceil((local.respawnAt - Date.now()) / 1000));
     ui.respawn.textContent = `RESPAWNING IN ${remain}s`;

@@ -6,7 +6,20 @@ export const MAX_HEALTH = 100;
 export const RESPAWN_DELAY_MS = 3000;
 export const MATCH_LENGTH_MS = 10 * 60 * 1000;
 
+export const STARTING_WEAPON = 'pistol';
+export const KILL_REWARD = 10;
+
 export const WEAPONS = {
+  pistol: {
+    name: 'Basic Pistol',
+    damage: 20,
+    fireRateMs: 1000,
+    magazine: 10,
+    reloadMs: 1400,
+    spread: 0.01,
+    recoil: 0.0015,
+    range: 100
+  },
   rifle: {
     name: 'VX-7 Rifle',
     damage: 18,
@@ -38,3 +51,6 @@ export const WEAPONS = {
     range: 280
   }
 };
+
+
+export const WEAPON_COSTS = { pistol: 0, rifle: 120, smg: 90, sniper: 180 };
