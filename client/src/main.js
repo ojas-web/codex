@@ -260,8 +260,9 @@ socket.on('snapshot', (snap) => {
 
 if (ui.shopToggle && ui.shop) {
   ui.shopToggle.onclick = () => {
-    ui.shop.classList.toggle('shop-closed');
-    ui.shop.classList.toggle('shop-open');
+    const open = ui.shop.classList.toggle('shop-open');
+    ui.shop.classList.toggle('shop-closed', !open);
+    ui.shopToggle.textContent = open ? 'CLOSE SHOP' : 'SHOP';
   };
 }
 
