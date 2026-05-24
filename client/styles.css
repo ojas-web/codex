@@ -1,0 +1,17 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; font-family: Inter, system-ui, sans-serif; }
+body { margin: 0; overflow: hidden; background: #02040b; }
+#game { width: 100vw; height: 100vh; display: block; }
+.panel { position: fixed; inset: 0; display: grid; place-content: center; gap: 1rem; text-align: center; background: radial-gradient(circle, #131c36 0, #02040b 70%); z-index: 20; }
+button { padding: .9rem 1.2rem; border: 0; border-radius: 10px; background: linear-gradient(90deg,#00d9ff,#8c4dff); color: #fff; font-weight: 700; }
+#hud { position: fixed; inset: 0; pointer-events: none; color: #dffcff; text-shadow: 0 0 8px #00e5ff; }
+#crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 1.8rem; }
+.topbar,.bottombar { position: absolute; left: 1rem; right: 1rem; display: flex; justify-content: space-between; }
+.topbar { top: 1rem; }
+.bottombar { bottom: 1rem; }
+#mobileControls { display: none; position: fixed; bottom: 5rem; right: 1rem; gap: .5rem; z-index: 15; }
+@media (max-width: 900px) { #mobileControls { display: flex; } }
+
+#respawn{position:fixed;left:50%;top:18%;transform:translateX(-50%);padding:10px 14px;border:1px solid #ff4d7e;background:#12050acc;color:#ff7aa6;font-weight:700;letter-spacing:1px}.hidden{display:none}
+
+#mobileControls{left:1rem;right:1rem;justify-content:space-between;align-items:flex-end}#joystick{width:110px;height:110px;border-radius:55px;border:2px solid #4de3ff88;background:#09111ccc;position:relative;touch-action:none}#joyKnob{width:44px;height:44px;border-radius:22px;background:#00d9ff;position:absolute;left:33px;top:33px;box-shadow:0 0 16px #00d9ff}#shootBtn,#jumpBtn{min-width:84px;touch-action:none}
