@@ -37,6 +37,8 @@ const BOT_SEPARATION_RADIUS = 6;
 const BOT_SEPARATION_FORCE = 0.14;
 const BOT_MAX_STEP_PER_TICK = 0.22;
 const HIT_RADIUS = 3.2;
+const BOT_DAMAGE_MULTIPLIER = 0.45;
+const BOT_MIN_SHOT_INTERVAL_MS = 320;
 
 const spawnPoints = {
   [TEAM_A]: [{ x: -60, y: 2, z: -40 }, { x: -50, y: 2, z: 30 }],
@@ -114,7 +116,8 @@ const createBot = (index) => {
 const spawnProjectile = (shooter) => {
   const weapon = WEAPONS[shooter.weapon] || WEAPONS.rifle;
   const now = Date.now();
-  if (shooter.ammo <= 0 || now - shooter.lastShotMs < weapon.fireRateMs) return;
+  const shotInterval = shooter.bot ? Math.max(weapon.fireRateMs, BOT_MIN_SHOT_INTERVAL_MS) : weapon.fireRateMs;
+  if (shooter.ammo <= 0 || now - shooter.lastShotMs < shotInterval) return;
 
   shooter.lastShotMs = now;
   shooter.ammo -= 1;
@@ -129,7 +132,7 @@ const spawnProjectile = (shooter) => {
       y: Math.sin(shooter.pitch) * -1,
       z: Math.cos(shooter.rotationY)
     },
-    dmg: weapon.damage,
+    dmg: shooter.bot ? Math.max(4, Math.round(weapon.damage * BOT_DAMAGE_MULTIPLIER)) : weapon.damage,
     speed: 3,
     ttl: 40
   });
