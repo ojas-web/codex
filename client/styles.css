@@ -1,7 +1,7 @@
 :root { color-scheme: dark; }
 * { box-sizing: border-box; font-family: Inter, system-ui, sans-serif; }
 body { margin: 0; overflow: hidden; background: #02040b; }
-#game { width: 100vw; height: 100vh; display: block; }
+#game { width: 100vw; height: 100vh; display: block; touch-action:none; }
 .panel { position: fixed; inset: 0; display: grid; place-content: center; gap: 1rem; text-align: center; background: radial-gradient(circle, #131c36 0, #02040b 70%); z-index: 20; }
 button { padding: .9rem 1.2rem; border: 0; border-radius: 10px; background: linear-gradient(90deg,#00d9ff,#8c4dff); color: #fff; font-weight: 700; }
 #hud { position: fixed; inset: 0; pointer-events: none; color: #dffcff; text-shadow: 0 0 8px #00e5ff; }

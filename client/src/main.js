@@ -194,18 +194,41 @@ addEventListener('resize', () => {
 });
 
 if (isMobile) {
+  let lookTouchId = null;
   let lastTouch = null;
-  canvas.addEventListener('touchmove', (e) => {
-    if (e.touches.length !== 1) return;
-    const t = e.touches[0];
-    if (!lastTouch) { lastTouch = { x: t.clientX, y: t.clientY }; return; }
-    const dx = t.clientX - lastTouch.x;
-    const dy = t.clientY - lastTouch.y;
-    local.yaw -= dx * 0.004;
-    local.pitch = Math.max(-1.3, Math.min(1.3, local.pitch - dy * 0.004));
-    lastTouch = { x: t.clientX, y: t.clientY };
+
+  const isControlTouch = (target) => !!target?.closest?.('#mobileControls');
+
+  document.addEventListener('touchstart', (e) => {
+    for (const t of e.changedTouches) {
+      if (isControlTouch(t.target)) continue;
+      lookTouchId = t.identifier;
+      lastTouch = { x: t.clientX, y: t.clientY };
+      break;
+    }
   }, { passive: true });
-  canvas.addEventListener('touchend', () => { lastTouch = null; }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (lookTouchId === null || !lastTouch) return;
+    for (const t of e.changedTouches) {
+      if (t.identifier !== lookTouchId) continue;
+      const dx = t.clientX - lastTouch.x;
+      const dy = t.clientY - lastTouch.y;
+      local.yaw -= dx * 0.004;
+      local.pitch = Math.max(-1.3, Math.min(1.3, local.pitch - dy * 0.004));
+      lastTouch = { x: t.clientX, y: t.clientY };
+      break;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== lookTouchId) continue;
+      lookTouchId = null;
+      lastTouch = null;
+      break;
+    }
+  }, { passive: true });
 }
 
 addEventListener('mousedown', () => pointerLocked && keys.add('Mouse0'));
