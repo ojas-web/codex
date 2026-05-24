@@ -15,7 +15,9 @@ const ui = {
   leaderboardList: document.getElementById('leaderboardList'),
   money: document.getElementById('money'),
   shopItems: document.getElementById('shopItems'),
-  gameOver: document.getElementById('gameOverBanner')
+  gameOver: document.getElementById('gameOverBanner'),
+  shopToggle: document.getElementById('shopToggle'),
+  shop: document.getElementById('shop')
 };
 
 
@@ -71,11 +73,11 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0xd7e8bf, 0.0017);
+scene.fog = new THREE.FogExp2(0xe8f5d9, 0.0012);
 const camera = new THREE.PerspectiveCamera(85, innerWidth / innerHeight, 0.1, 500);
 
 scene.add(new THREE.HemisphereLight(0xeef7ff, 0x9cc47e, 1.25));
-const sun = new THREE.DirectionalLight(0xfff7df, 1.8);
+const sun = new THREE.DirectionalLight(0xffffff, 2.1);
 sun.position.set(45, 80, 30);
 sun.castShadow = true;
 scene.add(sun);
@@ -104,12 +106,20 @@ boundary.position.y = 0.12;
 scene.add(boundary);
 
 const house = new THREE.Group();
-const houseBody = new THREE.Mesh(new THREE.BoxGeometry(44, 18, 44), new THREE.MeshStandardMaterial({ color: 0xcbb99f, roughness: 0.9 }));
-houseBody.position.y = 9;
-const roof = new THREE.Mesh(new THREE.ConeGeometry(34, 14, 4), new THREE.MeshStandardMaterial({ color: 0x8f3f2e, roughness: 0.85 }));
-roof.position.y = 24;
-roof.rotation.y = Math.PI / 4;
-house.add(houseBody, roof);
+const wallMat = new THREE.MeshStandardMaterial({ color: 0xd9c9b1, roughness: 0.88 });
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x6f5238, roughness: 0.92 });
+const roofMat = new THREE.MeshStandardMaterial({ color: 0x8f3f2e, roughness: 0.85 });
+const floorInside = new THREE.Mesh(new THREE.PlaneGeometry(38, 38), floorMat);
+floorInside.rotation.x = -Math.PI / 2;
+floorInside.position.y = 0.06;
+const wallN = new THREE.Mesh(new THREE.BoxGeometry(40, 16, 1.2), wallMat); wallN.position.set(0, 8, -19.4);
+const wallS1 = new THREE.Mesh(new THREE.BoxGeometry(15.5, 16, 1.2), wallMat); wallS1.position.set(-12.2, 8, 19.4);
+const wallS2 = new THREE.Mesh(new THREE.BoxGeometry(15.5, 16, 1.2), wallMat); wallS2.position.set(12.2, 8, 19.4);
+const wallW = new THREE.Mesh(new THREE.BoxGeometry(1.2, 16, 40), wallMat); wallW.position.set(-19.4, 8, 0);
+const wallE = new THREE.Mesh(new THREE.BoxGeometry(1.2, 16, 40), wallMat); wallE.position.set(19.4, 8, 0);
+const table = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 3), new THREE.MeshStandardMaterial({ color: 0x5b3f2d, roughness: 0.9 })); table.position.set(0, 2, -4);
+const roof = new THREE.Mesh(new THREE.ConeGeometry(34, 14, 4), roofMat); roof.position.y = 24; roof.rotation.y = Math.PI / 4;
+house.add(floorInside, wallN, wallS1, wallS2, wallW, wallE, table, roof);
 scene.add(house);
 
 
@@ -247,6 +257,14 @@ socket.on('snapshot', (snap) => {
 });
 
 
+
+if (ui.shopToggle && ui.shop) {
+  ui.shopToggle.onclick = () => {
+    ui.shop.classList.toggle('shop-closed');
+    ui.shop.classList.toggle('shop-open');
+  };
+}
+
 mobileControls.style.display = isMobile ? 'flex' : 'none';
 if (isMobile) {
   menu.style.display = 'none';
@@ -360,7 +378,9 @@ document.addEventListener('pointerlockchange', () => {
     return;
   }
   pointerLocked = !!document.pointerLockElement;
-  if (!pointerLocked) menu.style.display = 'grid';
+  if (!pointerLocked) {
+    menu.style.display = 'none';
+  }
 });
 
 

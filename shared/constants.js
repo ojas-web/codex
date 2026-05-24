@@ -18,7 +18,7 @@ export const WEAPONS = {
     reloadMs: 1400,
     spread: 0.01,
     recoil: 0.0015,
-    range: 220
+    range: 320
   },
   rifle: {
     name: 'Rifle',

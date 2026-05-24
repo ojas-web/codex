@@ -47,8 +47,8 @@ const state = {
 };
 
 const spawnPoints = {
-  [TEAM_A]: [{ x: -54, y: 2, z: -46 }, { x: -48, y: 2, z: 38 }],
-  [TEAM_B]: [{ x: 54, y: 2, z: 46 }, { x: 48, y: 2, z: -38 }]
+  [TEAM_A]: [{ x: -10, y: 2, z: -8 }, { x: -7, y: 2, z: 9 }],
+  [TEAM_B]: [{ x: 10, y: 2, z: 8 }, { x: 7, y: 2, z: -9 }]
 };
 
 const teamForJoin = () => {
