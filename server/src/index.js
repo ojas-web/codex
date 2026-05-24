@@ -39,6 +39,8 @@ const BOT_MAX_STEP_PER_TICK = 0.22;
 const HIT_RADIUS = 3.2;
 const BOT_DAMAGE_MULTIPLIER = 0.45;
 const BOT_MIN_SHOT_INTERVAL_MS = 320;
+const MAX_POSITION_DELTA_PER_TICK = 2.6;
+const ARENA_LIMIT = 96;
 
 const spawnPoints = {
   [TEAM_A]: [{ x: -60, y: 2, z: -40 }, { x: -50, y: 2, z: 30 }],
@@ -62,6 +64,20 @@ const canDamage = (attacker, target) => {
   if (!attacker || !target || attacker.id === target.id) return false;
   if (attacker.bot || target.bot) return true;
   return attacker.team !== target.team;
+};
+
+
+const clampToArena = (pos) => ({
+  x: Math.max(-ARENA_LIMIT, Math.min(ARENA_LIMIT, Number(pos?.x) || 0)),
+  y: Math.max(1.5, Math.min(6, Number(pos?.y) || 2)),
+  z: Math.max(-ARENA_LIMIT, Math.min(ARENA_LIMIT, Number(pos?.z) || 0))
+});
+
+const isReasonableMove = (from, to) => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  return dx * dx + dy * dy + dz * dz <= MAX_POSITION_DELTA_PER_TICK * MAX_POSITION_DELTA_PER_TICK;
 };
 
 const sanitizeInput = (input) => {
@@ -263,7 +279,8 @@ io.on('connection', (socket) => {
     const input = sanitizeInput(rawInput);
     const p = state.players.get(socket.id);
     if (!p || !p.alive || !input) return;
-    p.position = input.pos;
+    const clampedPos = clampToArena(input.pos);
+    if (isReasonableMove(p.position, clampedPos)) p.position = clampedPos;
     p.rotationY = input.rotY;
     p.pitch = input.pitch;
     p.velocity = input.velocity;

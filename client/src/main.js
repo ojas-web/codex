@@ -318,6 +318,8 @@ function tick(dt) {
   camera.rotation.y = local.yaw;
   camera.rotation.x = local.pitch;
 
+  if (!local.id) return;
+
   socket.emit('input', {
     seq: ++seq,
     pos: { x: local.pos.x, y: local.pos.y, z: local.pos.z },
