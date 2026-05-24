@@ -34,6 +34,8 @@ const ZOMBIE_OBJECTIVE_RADIUS = 24;
 const ZOMBIE_OBJECTIVE_THRESHOLD = 3;
 const MAX_POSITION_DELTA_PER_TICK = 2.6;
 const ARENA_LIMIT = MAP_SIZE / 2 - 8;
+const PLAYER_HIT_RADIUS = 3.2;
+const BOT_HIT_RADIUS = 5.4;
 
 const state = {
   startedAt: Date.now(),
@@ -336,7 +338,8 @@ setInterval(() => {
         const dx = proj.pos.x - target.position.x;
         const dy = proj.pos.y - target.position.y;
         const dz = proj.pos.z - target.position.z;
-        if (dx * dx + dy * dy + dz * dz <= 3.2 * 3.2) {
+        const hitRadius = target.bot ? BOT_HIT_RADIUS : PLAYER_HIT_RADIUS;
+        if (dx * dx + dy * dy + dz * dz <= hitRadius * hitRadius) {
           target.hp -= proj.dmg;
           proj.ttl = 0;
           if (target.hp <= 0) killPlayer(target, proj.owner);
