@@ -1,5 +1,5 @@
 export const TICK_RATE = 30;
-export const MAP_SIZE = 480;
+export const MAP_SIZE = 600;
 export const TEAM_A = 'A';
 export const TEAM_B = 'B';
 export const MAX_HEALTH = 100;
@@ -13,12 +13,12 @@ export const WEAPONS = {
   pistol: {
     name: 'Basic Pistol',
     damage: 20,
-    fireRateMs: 1000,
+    fireRateMs: 100,
     magazine: 10,
     reloadMs: 1400,
     spread: 0.01,
     recoil: 0.0015,
-    range: 320
+    range: 3200
   },
   rifle: {
     name: 'Rifle',
