@@ -39,9 +39,9 @@ const ARENA_LIMIT = MAP_SIZE / 2 - 8;
 const PLAYER_HIT_RADIUS = 3.2;
 const BOT_HIT_RADIUS = 9.5;
 
-const HOUSE_WALL_HALF = 19.4;
+const HOUSE_WALL_HALF = 39.4;
 const HOUSE_WALL_THICKNESS = 1.2;
-const HOUSE_ENTRANCE_HALF_WIDTH = 8;
+const HOUSE_ENTRANCE_HALF_WIDTH = 6;
 
 const intersectsWall = (pos) => {
   const withinBandZNorth = Math.abs(pos.z + HOUSE_WALL_HALF) <= HOUSE_WALL_THICKNESS;
@@ -161,7 +161,7 @@ const createBot = (index, team = index % 2 ? TEAM_A : TEAM_B) => {
     team,
     alive: true,
     hp: MAX_HEALTH,
-    money: 0,
+    money: 120,
     ammo: 0,
     weapon: 'fists',
     kills: 0,
@@ -208,7 +208,7 @@ const killPlayer = (target, ownerId) => {
   const killer = state.players.get(ownerId);
   if (killer) {
     killer.kills++;
-    if (!killer.bot) killer.money = (killer.money || 0) + KILL_REWARD;
+    if (!killer.bot && !target.bot) killer.money = (killer.money || 0) + KILL_REWARD;
     state.score[killer.team]++;
   }
 
@@ -298,29 +298,18 @@ const restartMatch = () => {
   state.nextZombieSpawnAt = state.matchZombieStartAt + ZOMBIE_SPAWN_INTERVAL_MS;
   state.turrets = [];
 
-  let botIndex = 1;
-  for (const p of state.players.values()) {
-    if (p.bot) {
-      const team = botIndex % 2 ? TEAM_A : TEAM_B;
-      const spawn = randomSpawn(team, true);
-      p.team = team;
-      p.position = { ...spawn };
-      p.hp = MAX_HEALTH;
-      p.alive = true;
-      p.kills = 0;
-      p.deaths = 0;
-      p.weapon = 'fists';
-      botIndex++;
-      continue;
-    }
+  for (const p of [...state.players.values()]) {
+    if (p.bot) state.players.delete(p.id);
+  }
 
+  for (const p of state.players.values()) {
     const spawn = randomSpawn(p.team);
     p.position = { ...spawn };
     p.hp = MAX_HEALTH;
     p.alive = true;
     p.kills = 0;
     p.deaths = 0;
-    p.money = 0;
+    p.money = 120;
     p.weapon = STARTING_WEAPON;
     p.ammo = WEAPONS[STARTING_WEAPON].magazine;
     p.respawnAt = 0;
@@ -399,7 +388,7 @@ io.on('connection', (socket) => {
 
 setInterval(() => {
   if (!state.gameOver) {
-    if (Date.now() >= state.nextZombieSpawnAt) {
+    if (Date.now() >= state.matchZombieStartAt && Date.now() >= state.nextZombieSpawnAt) {
       createBot(Math.floor(Math.random() * 100000), Math.random() > 0.5 ? TEAM_A : TEAM_B);
       state.nextZombieSpawnAt += ZOMBIE_SPAWN_INTERVAL_MS;
     }
@@ -446,7 +435,7 @@ setInterval(() => {
 
     for (const p of state.players.values()) {
       if (!p.alive && p.respawnAt && Date.now() >= p.respawnAt) {
-        const spawn = randomSpawn(p.team);
+        const spawn = randomSpawn(p.team, p.bot);
         p.position = { ...spawn };
         p.velocity = { x: 0, y: 0, z: 0 };
         p.hp = MAX_HEALTH;

@@ -140,6 +140,7 @@ const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
 let pointerLocked = false;
 const local = { id: null, team: null, yaw: 0, pitch: 0, pos: new THREE.Vector3(0, 2, 0), vel: new THREE.Vector3(), hp: 100, ammo: 10, money: 0, kills: 0, deaths: 0, weapon: 'pistol', alive: true, respawnAt: 0 };
 const players = new Map();
+const turrets = new Map();
 const projectiles = [];
 const tracerGroup = new THREE.Group();
 scene.add(tracerGroup);
@@ -194,6 +195,29 @@ const renderShop = () => {
       t.onclick = () => socket.emit('placeTurret', type);
       ui.turretItems.appendChild(t);
     });
+  }
+};
+
+const syncTurrets = (snapTurrets = []) => {
+  for (const t of snapTurrets) {
+    let mesh = turrets.get(t.id);
+    if (!mesh) {
+      const mat = new THREE.MeshStandardMaterial({ color: t.type === 'cannon' ? 0x3d4a59 : 0x2f6f6f, roughness: 0.6, metalness: 0.25 });
+      mesh = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 1.2, 12), mat);
+      const barrel = new THREE.Mesh(new THREE.BoxGeometry(t.type === 'cannon' ? 2.2 : 1.4, 0.4, 0.4), mat);
+      barrel.position.set(0.9, 0.35, 0);
+      mesh.add(base, barrel);
+      scene.add(mesh);
+      turrets.set(t.id, mesh);
+    }
+    mesh.position.set(t.position.x, t.position.y, t.position.z);
+  }
+  for (const [id, mesh] of turrets.entries()) {
+    if (!snapTurrets.find((t) => t.id === id)) {
+      scene.remove(mesh);
+      turrets.delete(id);
+    }
   }
 };
 
@@ -278,6 +302,7 @@ socket.on('snapshot', (snap) => {
     if (!snap.players.find((p) => p.id === id)) { scene.remove(mesh); players.delete(id); }
   }
   projectiles.splice(0, projectiles.length, ...snap.projectiles);
+  syncTurrets(snap.turrets);
   ui.score.textContent = `A ${snap.score.A} - ${snap.score.B} B`;
   const s = Math.floor(snap.remainingMs / 1000);
   ui.timer.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
