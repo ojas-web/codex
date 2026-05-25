@@ -34,7 +34,7 @@ const ZOMBIE_OBJECTIVE_RADIUS = 24;
 const ZOMBIE_OBJECTIVE_THRESHOLD = 3;
 const MATCH_ZOMBIE_START_DELAY_MS = 60_000;
 const ZOMBIE_SPAWN_INTERVAL_MS = 40_000;
-const MAX_POSITION_DELTA_PER_TICK = 2.6;
+const MAX_POSITION_DELTA_PER_TICK = 36;
 const ARENA_LIMIT = MAP_SIZE / 2 - 8;
 const PLAYER_HIT_RADIUS = 3.2;
 const BOT_HIT_RADIUS = 9.5;
@@ -161,7 +161,7 @@ const createBot = (index, team = index % 2 ? TEAM_A : TEAM_B) => {
     team,
     alive: true,
     hp: MAX_HEALTH,
-    money: 120,
+    money: 0,
     ammo: 0,
     weapon: 'fists',
     kills: 0,
@@ -250,8 +250,12 @@ const updateBots = () => {
     }
 
     const targetPos = nearest?.position || { x: 0, y: 2, z: 0 };
-    const dx = targetPos.x - bot.position.x;
-    const dz = targetPos.z - bot.position.z;
+    let moveTarget = { ...targetPos };
+    const outsideEntranceLane = Math.abs(bot.position.x) > HOUSE_ENTRANCE_HALF_WIDTH || bot.position.z > HOUSE_WALL_HALF;
+    if (outsideEntranceLane && targetPos.z < HOUSE_WALL_HALF) moveTarget = { x: 0, y: 2, z: HOUSE_WALL_HALF + 1.5 };
+
+    const dx = moveTarget.x - bot.position.x;
+    const dz = moveTarget.z - bot.position.z;
     const dist = Math.sqrt(dx * dx + dz * dz) || 0.0001;
     bot.rotationY = Math.atan2(dx, dz);
 
@@ -326,7 +330,7 @@ io.on('connection', (socket) => {
     team,
     alive: true,
     hp: MAX_HEALTH,
-    money: 0,
+    money: 120,
     ammo: WEAPONS[STARTING_WEAPON].magazine,
     weapon: STARTING_WEAPON,
     kills: 0,
