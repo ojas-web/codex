@@ -37,6 +37,41 @@ const ARENA_LIMIT = MAP_SIZE / 2 - 8;
 const PLAYER_HIT_RADIUS = 3.2;
 const BOT_HIT_RADIUS = 9.5;
 
+const HOUSE_WALL_HALF = 19.4;
+const HOUSE_WALL_THICKNESS = 1.2;
+const HOUSE_ENTRANCE_HALF_WIDTH = 8;
+
+const intersectsWall = (pos) => {
+  const withinBandZNorth = Math.abs(pos.z + HOUSE_WALL_HALF) <= HOUSE_WALL_THICKNESS;
+  const withinBandZSouth = Math.abs(pos.z - HOUSE_WALL_HALF) <= HOUSE_WALL_THICKNESS;
+  const withinBandX = Math.abs(pos.x) <= HOUSE_WALL_HALF;
+  if ((withinBandZNorth || withinBandZSouth) && withinBandX) {
+    if (withinBandZSouth && Math.abs(pos.x) <= HOUSE_ENTRANCE_HALF_WIDTH) return false;
+    return true;
+  }
+
+  const withinBandXWest = Math.abs(pos.x + HOUSE_WALL_HALF) <= HOUSE_WALL_THICKNESS;
+  const withinBandXEast = Math.abs(pos.x - HOUSE_WALL_HALF) <= HOUSE_WALL_THICKNESS;
+  const withinBandZ = Math.abs(pos.z) <= HOUSE_WALL_HALF;
+  if ((withinBandXWest || withinBandXEast) && withinBandZ) return true;
+
+  return false;
+};
+
+const resolveCollisionStep = (from, to) => {
+  const candidate = { ...to };
+  if (!intersectsWall(candidate)) return candidate;
+
+  const xOnly = { ...to, z: from.z };
+  if (!intersectsWall(xOnly)) return xOnly;
+
+  const zOnly = { ...to, x: from.x };
+  if (!intersectsWall(zOnly)) return zOnly;
+
+  return { ...from };
+};
+
+
 const state = {
   startedAt: Date.now(),
   players: new Map(),
@@ -202,8 +237,12 @@ const updateBots = () => {
     bot.rotationY = Math.atan2(dx, dz);
 
     const speed = nearest ? 0.35 : 0.22;
-    bot.position.x += (dx / dist) * Math.min(speed, dist);
-    bot.position.z += (dz / dist) * Math.min(speed, dist);
+    const nextPos = {
+      x: bot.position.x + (dx / dist) * Math.min(speed, dist),
+      y: bot.position.y,
+      z: bot.position.z + (dz / dist) * Math.min(speed, dist)
+    };
+    bot.position = resolveCollisionStep(bot.position, nextPos);
 
     if (nearest && dist <= ZOMBIE_MELEE_RANGE) {
       const now = Date.now();
@@ -300,7 +339,8 @@ io.on('connection', (socket) => {
     const p = state.players.get(socket.id);
     if (!p || !p.alive || !input || state.gameOver) return;
     const clampedPos = clampToArena(input.pos);
-    if (isReasonableMove(p.position, clampedPos)) p.position = clampedPos;
+    const collisionSafePos = resolveCollisionStep(p.position, clampedPos);
+    if (isReasonableMove(p.position, collisionSafePos)) p.position = collisionSafePos;
     p.rotationY = input.rotY;
     p.pitch = input.pitch;
     p.velocity = input.velocity;
