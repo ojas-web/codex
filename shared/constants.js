@@ -18,7 +18,7 @@ export const WEAPONS = {
     reloadMs: 1400,
     spread: 0.01,
     recoil: 0.0015,
-    range: 900
+    range: 1400
   },
   rifle: {
     name: 'Rifle',
@@ -49,7 +49,27 @@ export const WEAPONS = {
     spread: 0.001,
     recoil: 0.008,
     range: 280
+  },
+  shotgun: {
+    name: 'Shotgun',
+    damage: 14,
+    fireRateMs: 800,
+    magazine: 8,
+    reloadMs: 2000,
+    spread: 0.06,
+    recoil: 0.01,
+    range: 380
+  },
+  lmg: {
+    name: 'LMG',
+    damage: 15,
+    fireRateMs: 85,
+    magazine: 70,
+    reloadMs: 2800,
+    spread: 0.02,
+    recoil: 0.004,
+    range: 420
   }
 };
 
-export const WEAPON_COSTS = { pistol: 0, rifle: 120, smg: 90, sniper: 180 };
+export const WEAPON_COSTS = { pistol: 0, rifle: 120, smg: 90, sniper: 180, shotgun: 150, lmg: 220 };

@@ -15,6 +15,7 @@ const ui = {
   leaderboardList: document.getElementById('leaderboardList'),
   money: document.getElementById('money'),
   shopItems: document.getElementById('shopItems'),
+  turretItems: document.getElementById('turretItems'),
   gameOver: document.getElementById('gameOverBanner'),
   shopToggle: document.getElementById('shopToggle'),
   shop: document.getElementById('shop')
@@ -73,19 +74,29 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0xeff8e6, 0.00085);
+scene.fog = new THREE.FogExp2(0xd9efff, 0.00045);
 const camera = new THREE.PerspectiveCamera(85, innerWidth / innerHeight, 0.1, 500);
 
-scene.add(new THREE.HemisphereLight(0xf4fbff, 0xb6d38d, 1.45));
-const sun = new THREE.DirectionalLight(0xfffdf2, 2.7);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xbccf90, 1.85));
+const sun = new THREE.DirectionalLight(0xfff7d6, 3.8);
 sun.position.set(45, 80, 30);
 sun.castShadow = true;
 scene.add(sun);
 
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(520, 520), new THREE.MeshStandardMaterial({ color: 0x5e8e4b, metalness: 0.02, roughness: 0.95 }));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(520, 520), new THREE.MeshStandardMaterial({ color: 0x4a7a39, metalness: 0.02, roughness: 0.95 }));
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
+const island = new THREE.Mesh(new THREE.CylinderGeometry(86, 110, 20, 48), new THREE.MeshStandardMaterial({ color: 0x957b58, roughness: 0.96 }));
+island.position.y = -10;
+scene.add(island);
+const ocean = new THREE.Mesh(new THREE.CircleGeometry(700, 80), new THREE.MeshStandardMaterial({ color: 0x67b7e6, roughness: 0.4, metalness: 0.1 }));
+ocean.rotation.x = -Math.PI / 2;
+ocean.position.y = -20;
+scene.add(ocean);
+const pathToHouse = new THREE.Mesh(new THREE.BoxGeometry(20, 0.5, 170), new THREE.MeshStandardMaterial({ color: 0xb7a07a, roughness: 1 }));
+pathToHouse.position.set(0, 0.2, 130);
+scene.add(pathToHouse);
 
 
 for (let i = 0; i < 240; i++) {
@@ -109,10 +120,10 @@ const house = new THREE.Group();
 const wallMat = new THREE.MeshStandardMaterial({ color: 0xd9c9b1, roughness: 0.88 });
 const floorMat = new THREE.MeshStandardMaterial({ color: 0x6f5238, roughness: 0.92 });
 const roofMat = new THREE.MeshStandardMaterial({ color: 0x8f3f2e, roughness: 0.85 });
-const floorInside = new THREE.Mesh(new THREE.PlaneGeometry(38, 38), floorMat);
+const floorInside = new THREE.Mesh(new THREE.PlaneGeometry(78, 78), floorMat);
 floorInside.rotation.x = -Math.PI / 2;
 floorInside.position.y = 0.06;
-const wallN = new THREE.Mesh(new THREE.BoxGeometry(40, 16, 1.2), wallMat); wallN.position.set(0, 8, -19.4);
+const wallN = new THREE.Mesh(new THREE.BoxGeometry(80, 22, 1.2), wallMat); wallN.position.set(0, 11, -39.4);
 const wallS1 = new THREE.Mesh(new THREE.BoxGeometry(15.5, 16, 1.2), wallMat); wallS1.position.set(-12.2, 8, 19.4);
 const wallS2 = new THREE.Mesh(new THREE.BoxGeometry(15.5, 16, 1.2), wallMat); wallS2.position.set(12.2, 8, 19.4);
 const wallW = new THREE.Mesh(new THREE.BoxGeometry(1.2, 16, 40), wallMat); wallW.position.set(-19.4, 8, 0);
@@ -161,7 +172,9 @@ const shopConfig = [
   { key: 'pistol', label: 'Basic Pistol', cost: 0 },
   { key: 'smg', label: 'SMG', cost: 90 },
   { key: 'rifle', label: 'Rifle', cost: 120 },
-  { key: 'sniper', label: 'Sniper', cost: 180 }
+  { key: 'sniper', label: 'Sniper', cost: 180 },
+  { key: 'shotgun', label: 'Shotgun', cost: 150 },
+  { key: 'lmg', label: 'LMG', cost: 220 }
 ];
 
 const renderShop = () => {
@@ -173,6 +186,14 @@ const renderShop = () => {
     btn.disabled = local.money < item.cost || local.weapon === item.key;
     btn.onclick = () => socket.emit('buyWeapon', item.key);
     ui.shopItems.appendChild(btn);
+  }
+  if (ui.turretItems && !ui.turretItems.childElementCount) {
+    ['auto','cannon'].forEach((type) => {
+      const t = document.createElement('button');
+      t.textContent = `Place ${type.toUpperCase()} Turret`;
+      t.onclick = () => socket.emit('placeTurret', type);
+      ui.turretItems.appendChild(t);
+    });
   }
 };
 
@@ -246,6 +267,7 @@ socket.on('snapshot', (snap) => {
       m.userData.hpBar = hpBar;
     }
     m.visible = !!p.alive;
+    m.rotation.y = p.rotationY || 0;
     if (m.userData.hpBar?.userData?.updateHp) {
       const hp01 = Math.max(0, Math.min(1, (p.hp || 0) / ui.maxHp));
       m.userData.hpBar.userData.updateHp(hp01);

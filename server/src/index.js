@@ -32,6 +32,8 @@ const ZOMBIE_MELEE_DAMAGE = 12;
 const ZOMBIE_ATTACK_COOLDOWN_MS = 900;
 const ZOMBIE_OBJECTIVE_RADIUS = 24;
 const ZOMBIE_OBJECTIVE_THRESHOLD = 3;
+const MATCH_ZOMBIE_START_DELAY_MS = 60_000;
+const ZOMBIE_SPAWN_INTERVAL_MS = 40_000;
 const MAX_POSITION_DELTA_PER_TICK = 2.6;
 const ARENA_LIMIT = MAP_SIZE / 2 - 8;
 const PLAYER_HIT_RADIUS = 3.2;
@@ -78,18 +80,21 @@ const state = {
   projectiles: [],
   score: { [TEAM_A]: 0, [TEAM_B]: 0 },
   gameOver: false,
-  gameOverReason: ''
+  gameOverReason: '',
+  matchZombieStartAt: Date.now() + MATCH_ZOMBIE_START_DELAY_MS,
+  nextZombieSpawnAt: Date.now() + MATCH_ZOMBIE_START_DELAY_MS + ZOMBIE_SPAWN_INTERVAL_MS,
+  turrets: []
 };
 
 const playerSpawnPoints = {
-  [TEAM_A]: [{ x: -10, y: 2, z: -8 }, { x: -7, y: 2, z: 9 }],
-  [TEAM_B]: [{ x: 10, y: 2, z: 8 }, { x: 7, y: 2, z: -9 }]
+  [TEAM_A]: [{ x: -8, y: 2, z: 8 }, { x: -5, y: 2, z: 13 }],
+  [TEAM_B]: [{ x: 8, y: 2, z: 8 }, { x: 5, y: 2, z: 13 }]
 };
 
-const botSpawnPoints = {
-  [TEAM_A]: [{ x: -178, y: 2, z: -146 }, { x: -162, y: 2, z: 132 }, { x: -146, y: 2, z: 168 }],
-  [TEAM_B]: [{ x: 178, y: 2, z: 146 }, { x: 162, y: 2, z: -132 }, { x: 146, y: 2, z: -168 }]
-};
+const zombieSpawners = [
+  { x: -220, y: 2, z: -220 }, { x: -220, y: 2, z: 220 }, { x: 220, y: 2, z: -220 }, { x: 220, y: 2, z: 220 },
+  { x: 0, y: 2, z: -230 }, { x: -230, y: 2, z: 0 }, { x: 230, y: 2, z: 0 }
+];
 
 const teamForJoin = () => {
   let a = 0;
@@ -99,7 +104,8 @@ const teamForJoin = () => {
 };
 
 const randomSpawn = (team, forBot = false) => {
-  const spots = (forBot ? botSpawnPoints : playerSpawnPoints)[team];
+  if (forBot) return zombieSpawners[Math.floor(Math.random() * zombieSpawners.length)];
+  const spots = playerSpawnPoints[team];
   return spots[Math.floor(Math.random() * spots.length)];
 };
 
@@ -145,8 +151,7 @@ const sanitizeInput = (input) => {
   };
 };
 
-const createBot = (index) => {
-  const team = index % 2 ? TEAM_A : TEAM_B;
+const createBot = (index, team = index % 2 ? TEAM_A : TEAM_B) => {
   const spawn = randomSpawn(team, true);
   const id = `bot-${index}`;
   state.players.set(id, {
@@ -209,6 +214,20 @@ const killPlayer = (target, ownerId) => {
 
   target.velocity = { x: 0, y: 0, z: 0 };
   target.respawnAt = Date.now() + RESPAWN_DELAY_MS;
+};
+
+const applyProjectileHit = (target, ownerId, proj) => {
+  const headshot = target.bot && proj.pos.y >= target.position.y + 1.4;
+  if (headshot) {
+    target.hp = 0;
+  } else {
+    target.hp -= proj.dmg;
+  }
+  if (target.hp <= 0) {
+    killPlayer(target, ownerId);
+    const killer = state.players.get(ownerId);
+    if (killer && !killer.bot) killer.money += headshot ? 50 : 10;
+  }
 };
 
 const updateBots = () => {
@@ -275,6 +294,9 @@ const restartMatch = () => {
   state.startedAt = Date.now();
   state.gameOver = false;
   state.gameOverReason = '';
+  state.matchZombieStartAt = Date.now() + MATCH_ZOMBIE_START_DELAY_MS;
+  state.nextZombieSpawnAt = state.matchZombieStartAt + ZOMBIE_SPAWN_INTERVAL_MS;
+  state.turrets = [];
 
   let botIndex = 1;
   for (const p of state.players.values()) {
@@ -304,8 +326,6 @@ const restartMatch = () => {
     p.respawnAt = 0;
   }
 };
-
-for (let i = 0; i < 6; i++) createBot(i + 1);
 
 io.on('connection', (socket) => {
   const team = teamForJoin();
@@ -358,6 +378,15 @@ io.on('connection', (socket) => {
     p.weapon = weaponKey;
     p.ammo = WEAPONS[weaponKey].magazine;
   });
+  socket.on('placeTurret', (type) => {
+    const p = state.players.get(socket.id);
+    if (!p || !p.alive) return;
+    const ownedCount = state.turrets.filter((t) => t.owner === p.id).length;
+    if (ownedCount >= 2) return;
+    if (state.turrets.some((t) => t.owner === p.id && t.type === type)) return;
+    if (state.turrets.some((t) => (t.position.x - p.position.x) ** 2 + (t.position.z - p.position.z) ** 2 < 16)) return;
+    state.turrets.push({ id: `${p.id}-${type}`, owner: p.id, type, position: { ...p.position }, cooldownAt: 0 });
+  });
 
   socket.on('reload', () => {
     const p = state.players.get(socket.id);
@@ -370,7 +399,29 @@ io.on('connection', (socket) => {
 
 setInterval(() => {
   if (!state.gameOver) {
+    if (Date.now() >= state.nextZombieSpawnAt) {
+      createBot(Math.floor(Math.random() * 100000), Math.random() > 0.5 ? TEAM_A : TEAM_B);
+      state.nextZombieSpawnAt += ZOMBIE_SPAWN_INTERVAL_MS;
+    }
     updateBots();
+    const now = Date.now();
+    for (const turret of state.turrets) {
+      if (now < turret.cooldownAt) continue;
+      const nearestZombie = [...state.players.values()].filter((p) => p.bot && p.alive).sort((a, b) => {
+        const da = (a.position.x - turret.position.x) ** 2 + (a.position.z - turret.position.z) ** 2;
+        const db = (b.position.x - turret.position.x) ** 2 + (b.position.z - turret.position.z) ** 2;
+        return da - db;
+      })[0];
+      if (!nearestZombie) continue;
+      const dx = nearestZombie.position.x - turret.position.x;
+      const dz = nearestZombie.position.z - turret.position.z;
+      const distSq = dx * dx + dz * dz;
+      const range = turret.type === 'cannon' ? 180 : 120;
+      if (distSq > range * range) continue;
+      nearestZombie.hp -= turret.type === 'cannon' ? 40 : 14;
+      turret.cooldownAt = now + (turret.type === 'cannon' ? 1300 : 240);
+      if (nearestZombie.hp <= 0) killPlayer(nearestZombie, turret.owner);
+    }
 
     for (const proj of state.projectiles) {
       proj.pos.x += proj.dir.x * proj.speed;
@@ -385,9 +436,8 @@ setInterval(() => {
         const dz = proj.pos.z - target.position.z;
         const hitRadius = target.bot ? BOT_HIT_RADIUS : PLAYER_HIT_RADIUS;
         if (dx * dx + dy * dy + dz * dz <= hitRadius * hitRadius) {
-          target.hp -= proj.dmg;
+          applyProjectileHit(target, proj.owner, proj);
           proj.ttl = 0;
-          if (target.hp <= 0) killPlayer(target, proj.owner);
         }
       }
     }
@@ -417,7 +467,8 @@ setInterval(() => {
     score: state.score,
     gameOver: state.gameOver,
     gameOverReason: state.gameOverReason,
-    objective: { houseRadius: HOUSE_RADIUS }
+    objective: { houseRadius: HOUSE_RADIUS, zombieStartInMs: Math.max(0, state.matchZombieStartAt - Date.now()) },
+    turrets: state.turrets
   });
 }, 1000 / TICK_RATE);
 
